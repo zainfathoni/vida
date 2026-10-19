@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Vida</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Vida</div>
+    <input id="projectName" class="project-name" aria-label="Project name" value="Untitled" />
+    <span id="dirty" class="dirty" title="Changes are not saved"></span>
+    <nav class="actions">
+      <button id="btnNew">New</button>
+      <button id="btnOpen">Open…</button>
+      <button id="btnSave" title="Ctrl+S">Save</button>
+      <button id="btnSaveAs">Save as…</button>
+      <button id="btnUndo" title="Ctrl+Z">Undo</button>
+      <button id="btnRedo" title="Ctrl+Shift+Z">Redo</button>
+      <button id="btnExport" class="primary">Export…</button>
+    </nav>
+    <div id="jobs" class="jobs" aria-live="polite"></div>
+  </header>
+
+  <main class="layout">
+    <section class="panel sources">
+      <div class="panel-head">
+        <h2>Sources</h2>
+        <button id="btnAddSources" class="small primary">Add videos…</button>
+      </div>
+      <ul id="sourceList" class="source-list"></ul>
+      <p id="sourcesEmpty" class="empty">Add Screen Studio exports or camera recordings. The original files are not changed.</p>
+    </section>
+
+    <section class="panel monitor" id="sourceMonitor">
+      <div class="panel-head">
+        <h2>Source <span id="sourceTitle" class="muted"></span></h2>
+      </div>
+      <div class="screen">
+        <video id="sourceVideo" preload="auto" playsinline disableremoteplayback></video>
+        <div id="sourceMsg" class="screen-msg">Select a source</div>
+      </div>
+      <div class="scrub" id="sourceScrub">
+        <div class="range-mark" id="sourceRange"></div>
+        <input type="range" id="sourceSeek" min="0" max="1" step="0.001" value="0" aria-label="Source position" />
+      </div>
+      <div class="controls">
+        <button id="srcBack" title="Back one frame (←)">◀︎|</button>
+        <button id="srcPlay" title="Play or pause (Space)">Play</button>
+        <button id="srcFwd" title="Forward one frame (→)">|▶︎</button>
+        <span id="srcTime" class="time">0:00.00 / 0:00.00</span>
+        <span class="spacer"></span>
+        <button id="srcIn" title="Mark in (I)">In</button>
+        <button id="srcOut" title="Mark out (O)">Out</button>
+        <button id="srcAdd" class="primary" title="Add range to sequence (A)">Add to sequence</button>
+      </div>
+      <div class="marks" id="srcMarks">In – · Out – </div>
+    </section>
+
+    <section class="panel monitor" id="programMonitor">
+      <div class="panel-head">
+        <h2>Sequence preview</h2>
+        <label class="small-label"><input type="checkbox" id="showCaptions" checked /> Captions</label>
+      </div>
+      <div class="screen" id="programScreen">
+        <video id="progA" preload="auto" playsinline disableremoteplayback></video>
+        <video id="progB" preload="auto" playsinline disableremoteplayback></video>
+        <div id="captionOverlay" class="caption"></div>
+        <div id="programMsg" class="screen-msg">Add clips to the sequence</div>
+      </div>
+      <div class="scrub" id="programScrub">
+        <div id="programTicks" class="ticks"></div>
+        <input type="range" id="programSeek" min="0" max="1" step="0.001" value="0" aria-label="Sequence position" />
+      </div>
+      <div class="controls">
+        <button id="prgPrev" title="Previous clip">|◀︎</button>
+        <button id="prgPlay" title="Play or pause (Space)">Play</button>
+        <button id="prgNext" title="Next clip">▶︎|</button>
+        <span id="prgTime" class="time">0:00.00 / 0:00.00</span>
+        <span class="spacer"></span>
+        <span id="outputInfo" class="muted small-text"></span>
+      </div>
+    </section>
+
+    <section class="panel transcript">
+      <div class="panel-head">
+        <h2>Transcript <span id="transcriptTitle" class="muted"></span></h2>
+      </div>
+      <div id="transcriptTools" class="transcript-tools"></div>
+      <div id="transcriptHint" class="hint">Click a line to go to it. Shift+click a second line to select a range. Double-click text to correct it.</div>
+      <ol id="transcriptList" class="transcript-list"></ol>
+      <div id="transcriptSelBar" class="sel-bar" hidden>
+        <span id="transcriptSelInfo"></span>
+        <button id="transcriptAdd" class="small primary">Add selection to sequence</button>
+      </div>
+    </section>
+
+    <section class="panel timeline-panel">
+      <div class="panel-head">
+        <h2>Sequence <span id="seqInfo" class="muted"></span></h2>
+        <label class="small-label">Zoom <input type="range" id="zoom" min="2" max="160" value="40" /></label>
+      </div>
+      <div id="timeline" class="timeline" tabindex="0" aria-label="Sequence clips">
+        <div id="track" class="track"></div>
+        <div id="playhead" class="playhead"></div>
+      </div>
+      <div id="inspector" class="inspector"></div>
+    </section>
+  </main>
+
+  <dialog id="fileDialog" class="file-dialog">
+    <form method="dialog" id="fileForm">
+      <h3 id="fileTitle">Choose files</h3>
+      <div class="path-row">
+        <button type="button" id="fileUp" title="Parent folder">↑</button>
+        <button type="button" id="fileHome">Home</button>
+        <input id="filePath" aria-label="Folder path" />
+        <button type="button" id="fileGo">Go</button>
+      </div>
+      <ul id="fileList" class="file-list"></ul>
+      <div class="name-row" id="fileNameRow">
+        <label>File name <input id="fileName" /></label>
+      </div>
+      <p class="hint" id="fileHint"></p>
+      <div class="dialog-actions">
+        <button value="cancel" type="button" id="fileCancel">Cancel</button>
+        <button value="ok" class="primary" id="fileOk">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="exportDialog" class="export-dialog">
+    <form method="dialog" id="exportForm">
+      <h3>Export</h3>
+      <div class="grid2">
+        <label>Size
+          <select id="expSize">
+            <option value="auto">Same as first clip</option>
+            <option value="1280x720">1280 × 720</option>
+            <option value="1920x1080">1920 × 1080</option>
+            <option value="2560x1440">2560 × 1440</option>
+            <option value="3840x2160">3840 × 2160</option>
+            <option value="1080x1920">1080 × 1920 (portrait, letterboxed)</option>
+          </select>
+        </label>
+        <label>Frame rate
+          <select id="expFps">
+            <option value="auto">Same as first clip</option>
+            <option>24</option><option>25</option><option>30</option><option>50</option><option>60</option>
+          </select>
+        </label>
+      </div>
+      <label>Video file
+        <div class="path-row"><input id="expFile" /><button type="button" id="expBrowse">Choose…</button></div>
+      </label>
+      <p class="hint">Vida writes an MP4 (H.264, AAC) and SRT and VTT captions with the same base name. Sources with a different shape get black bars. Nothing is cropped.</p>
+      <p id="expSummary" class="hint"></p>
+      <div id="expProgress" class="progress" hidden><div></div></div>
+      <p id="expResult" class="result"></p>
+      <div class="dialog-actions">
+        <button type="button" id="expClose">Close</button>
+        <button type="button" id="expCaptions">Captions only</button>
+        <button type="button" id="expStart" class="primary">Export video and captions</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

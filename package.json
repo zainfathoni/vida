@@ -1,0 +1,15 @@
+{
+  "name": "vida",
+  "version": "0.1.0",
+  "description": "Small local-first video editor: import takes, cut by transcript, reorder, preview, and export one video with SRT/VTT captions.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server/index.js --open",
+    "serve": "node server/index.js",
+    "test": "node --test test/unit.test.js",
+    "test:e2e": "node --test test/e2e.test.js",
+    "fixtures": "node scripts/make-fixtures.js fixtures"
+  }
+}
