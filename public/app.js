@@ -2,6 +2,7 @@ import {
   buildPlan, planDuration, locate, remapCaptions, resolveOutput, transcriptRows,
   formatClock, parseClock, MIN_CLIP,
 } from './lib/timeline.js';
+import { History } from './lib/history.js';
 
 // ------------------------------------------------------------------ helpers
 
@@ -17,7 +18,7 @@ const COLORS = ['#4f8cff', '#f0814c', '#3cc68a', '#c86bff', '#f0c24c', '#4cd3f0'
 async function api(path, body) {
   const res = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  if (!res.ok) throw Object.assign(new Error(data.error || `Request failed (${res.status})`), { status: res.status, code: data.code });
   return data;
 }
 
@@ -36,6 +37,8 @@ const mediaUrl = (src) => `/media?path=${encodeURIComponent(src.proxyPath || src
 
 const state = {
   file: null,
+  revision: null, // hash of the project file as Vida last read or wrote it
+  doc: 0, // changes when New or Open replaces the project in the editor
   dirty: false,
   project: newProject(),
   selectedSourceId: null,
@@ -43,8 +46,7 @@ const state = {
   marks: {}, // sourceId -> {in, out}
   transcriptSel: null, // {anchor, focus} row indices
   status: null,
-  undo: [],
-  redo: [],
+  history: new History(),
   focus: 'source',
 };
 
@@ -65,10 +67,10 @@ function transcripts() {
 }
 
 /** Call before every change, so Undo can return to this state. */
+const snapshot = () => ({ json: JSON.stringify(project()), revision: state.revision });
+
 function checkpoint() {
-  state.undo.push(JSON.stringify(project()));
-  if (state.undo.length > 100) state.undo.shift();
-  state.redo = [];
+  state.history.record(snapshot());
 }
 
 function changed({ timeline = true } = {}) {
@@ -78,9 +80,16 @@ function changed({ timeline = true } = {}) {
   else program.refreshCues();
 }
 
-function restore(snapshot) {
+function restore(entry) {
   const runtime = new Map(project().sources.map((s) => [s.id, { proxyPath: s.proxyPath, needsProxy: s.needsProxy }]));
-  state.project = JSON.parse(snapshot);
+  state.project = JSON.parse(entry.json);
+  if (entry.revision !== state.revision) {
+    // This version is based on another revision of the file. Check the disk again.
+    state.revision = entry.revision;
+    dismissedRevision = undefined;
+    hideDiskBanner();
+    setTimeout(checkDisk);
+  }
   for (const s of project().sources) Object.assign(s, runtime.get(s.id) || {});
   if (!sourceById(state.selectedSourceId)) state.selectedSourceId = null;
   if (!project().sequence.some((c) => c.id === state.selectedClipId)) state.selectedClipId = null;
@@ -89,14 +98,12 @@ function restore(snapshot) {
 }
 
 function undo() {
-  if (!state.undo.length) return;
-  state.redo.push(JSON.stringify(project()));
-  restore(state.undo.pop());
+  const entry = state.history.undo(snapshot());
+  if (entry) restore(entry);
 }
 function redo() {
-  if (!state.redo.length) return;
-  state.undo.push(JSON.stringify(project()));
-  restore(state.redo.pop());
+  const entry = state.history.redo(snapshot());
+  if (entry) restore(entry);
 }
 
 // ------------------------------------------------------------------ jobs UI
@@ -1038,8 +1045,8 @@ function renderTitle() {
   $('projectName').value = project().name;
   $('dirty').classList.toggle('on', state.dirty);
   document.title = `${state.dirty ? '• ' : ''}${project().name} – Vida`;
-  $('btnUndo').disabled = !state.undo.length;
-  $('btnRedo').disabled = !state.redo.length;
+  $('btnUndo').disabled = !state.history.canUndo;
+  $('btnRedo').disabled = !state.history.canRedo;
   const o = output();
   $('outputInfo').textContent = project().sequence.length ? `Output ${o.width}×${o.height} · ${o.fps} fps` : '';
 }
@@ -1058,7 +1065,10 @@ function newProjectAction() {
   if (!confirmDiscard()) return;
   program.pause();
   state.project = newProject();
-  Object.assign(state, { file: null, dirty: false, selectedSourceId: null, selectedClipId: null, marks: {}, undo: [], redo: [] });
+  state.doc++;
+  Object.assign(state, { file: null, revision: null, dirty: false, selectedSourceId: null, selectedClipId: null, marks: {} });
+  state.history.clear();
+  hideDiskBanner();
   loadSource(null);
   renderAll();
   program.reload();
@@ -1073,10 +1083,13 @@ async function openProjectAction() {
 
 async function openProjectFile(file) {
   try {
-    const { project: p, file: resolved } = await api('/api/project/open', { file });
+    const { project: p, file: resolved, revision } = await api('/api/project/open', { file });
     program.pause();
     state.project = { name: p.name, output: p.output || {}, sources: p.sources, sequence: p.sequence };
-    Object.assign(state, { file: resolved, dirty: false, selectedClipId: null, marks: {}, undo: [], redo: [] });
+    state.doc++;
+    Object.assign(state, { file: resolved, revision, dirty: false, selectedClipId: null, marks: {} });
+    state.history.clear();
+    hideDiskBanner();
     localStorage.setItem('vida.lastProject', resolved);
     const missing = p.sources.filter((s) => s.missing).length;
     for (const s of p.sources) if (s.needsProxy && !s.proxyPath && !s.missing) makeProxy(s);
@@ -1085,32 +1098,114 @@ async function openProjectFile(file) {
     program.t = 0;
     program.reload();
     toast(missing ? `Opened. ${missing} source file(s) are missing.` : 'Project opened', missing > 0);
-  } catch (err) {
-    toast(err.message, true);
-  }
-}
-
-async function saveProjectAction(saveAs = false) {
-  let file = state.file;
-  if (!file || saveAs) {
-    const firstDir = project().sources[0] ? project().sources[0].path.replace(/[\\/][^\\/]*$/, '') : undefined;
-    file = await fileDialog.open({ title: 'Save project', kind: 'project', mode: 'save', defaultName: `${project().name}.vida.json`, dir: state.file ? state.file.replace(/[\\/][^\\/]*$/, '') : firstDir, hint: 'The project file keeps your cuts and transcripts. It does not copy the videos.' });
-    if (!file) return false;
-    if (!file.endsWith('.vida.json')) file = file.replace(/\.json$/, '') + '.vida.json';
-  }
-  try {
-    const res = await api('/api/project/save', { file, project: project() });
-    state.file = res.file;
-    state.dirty = false;
-    localStorage.setItem('vida.lastProject', res.file);
-    renderTitle();
-    toast(`Saved ${res.file}`);
     return true;
   } catch (err) {
     toast(err.message, true);
     return false;
   }
 }
+
+async function saveProjectAction(saveAs = false, { overwrite = false, file: target } = {}) {
+  let file = target || state.file;
+  if (!file || saveAs) {
+    const firstDir = project().sources[0] ? project().sources[0].path.replace(/[\\/][^\\/]*$/, '') : undefined;
+    file = await fileDialog.open({ title: 'Save project', kind: 'project', mode: 'save', defaultName: `${project().name}.vida.json`, dir: state.file ? state.file.replace(/[\\/][^\\/]*$/, '') : firstDir, hint: 'The project file keeps your cuts and transcripts. It does not copy the videos.' });
+    if (!file) return false;
+    if (!file.endsWith('.vida.json')) file = file.replace(/\.json$/, '') + '.vida.json';
+  }
+  // The save is for this project and this version. The person can keep
+  // editing, or open another project, before the server answers.
+  const { doc, file: startFile, revision: startRevision } = state;
+  const sent = JSON.stringify(project());
+  saving++;
+  try {
+    // The server refuses to replace a file that changed on disk since Vida read it.
+    const baseRevision = file === startFile ? startRevision : null;
+    const res = await api('/api/project/save', { file, project: project(), baseRevision, overwrite });
+    if (state.doc !== doc) {
+      toast(`Saved ${res.file}. That project is not open now.`);
+      return true;
+    }
+    state.history.saved(startRevision, res.revision, { otherFile: res.file !== startFile });
+    // An Undo during the save can go to a version with another revision. Keep that revision.
+    if (state.revision === startRevision) state.revision = res.revision;
+    state.file = res.file;
+    // Edits made during the save are not in the file yet.
+    state.dirty = JSON.stringify(project()) !== sent;
+    hideDiskBanner();
+    localStorage.setItem('vida.lastProject', res.file);
+    renderTitle();
+    toast(`Saved ${res.file}`);
+    return true;
+  } catch (err) {
+    if (err.code === 'conflict' && state.doc === doc) showDiskBanner(err.message, { file, conflict: true });
+    else toast(err.message, true);
+    return false;
+  } finally {
+    saving--;
+  }
+}
+
+// ------------------------------------------------- project changes on disk
+// An agent or another program can change the project file while it is open.
+// Vida checks the file on disk and never replaces or discards a version
+// without an explicit action by the user.
+
+let bannerFile = null;
+let dismissedRevision;
+let saving = 0; // the disk changes during a save are Vida's own
+
+function showDiskBanner(message, { file = state.file, conflict = false, deleted = false } = {}) {
+  bannerFile = file;
+  $('diskMsg').textContent = message;
+  $('diskReload').hidden = deleted || file !== state.file;
+  $('diskReload').textContent = state.dirty ? 'Reload from disk (Undo keeps your edits)' : 'Reload from disk';
+  $('diskOverwrite').hidden = !conflict;
+  $('diskBanner').hidden = false;
+}
+
+function hideDiskBanner() {
+  $('diskBanner').hidden = true;
+  bannerFile = null;
+}
+
+async function checkDisk() {
+  if (!state.file || document.hidden || saving) return;
+  const { file, revision } = state;
+  let disk;
+  try {
+    disk = (await api(`/api/project/revision?file=${encodeURIComponent(file)}`)).revision;
+  } catch {
+    return;
+  }
+  // Ignore the answer if Vida opened or saved a file while the request ran.
+  if (state.file !== file || state.revision !== revision) return;
+  if (disk === revision || disk === dismissedRevision || !$('diskBanner').hidden) return;
+  showDiskBanner(
+    disk === null
+      ? 'The project file was moved or deleted on disk. Save as… writes your version to a file.'
+      : `The project file changed on disk${state.dirty ? ', and you have unsaved changes' : ''}. Reload it to see the new version.`,
+    { deleted: disk === null },
+  );
+  dismissedRevision = disk;
+}
+
+$('diskReload').onclick = async () => {
+  const before = snapshot();
+  const hadEdits = state.dirty;
+  if (await openProjectFile(state.file)) {
+    // Undo returns to the version that was in Vida before the reload, with its
+    // old revision. A normal Save of it is rejected as stale.
+    state.history.record(before);
+    renderTitle();
+    toast(hadEdits ? 'Reloaded from disk. Undo (Ctrl+Z) brings back your unsaved version. To keep it, use Save as… or Replace.' : 'Reloaded from disk.');
+  }
+};
+$('diskSaveAs').onclick = () => saveProjectAction(true);
+$('diskOverwrite').onclick = () => saveProjectAction(false, { overwrite: true, file: bannerFile });
+$('diskDismiss').onclick = hideDiskBanner;
+setInterval(checkDisk, 2000);
+window.addEventListener('focus', checkDisk);
 
 $('btnNew').onclick = newProjectAction;
 $('btnOpen').onclick = openProjectAction;

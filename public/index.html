@@ -22,6 +22,13 @@
     </nav>
     <div id="jobs" class="jobs" aria-live="polite"></div>
   </header>
+  <div id="diskBanner" class="disk-banner" role="alert" hidden>
+    <span id="diskMsg"></span>
+    <button id="diskReload" class="small primary">Reload from disk</button>
+    <button id="diskSaveAs" class="small">Save as…</button>
+    <button id="diskOverwrite" class="small danger">Replace the file on disk</button>
+    <button id="diskDismiss" class="small">Keep editing</button>
+  </div>
 
   <main class="layout">
     <section class="panel sources">

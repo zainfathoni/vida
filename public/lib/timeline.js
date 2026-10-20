@@ -28,7 +28,85 @@ export function snapFps(fps) {
 
 /** Number of output frames for a clip. Never less than one frame. */
 export function clipFrames(clip, fps) {
+  if (!Number.isFinite(clip.in) || !Number.isFinite(clip.out) || clip.out <= clip.in) {
+    throw new RangeError(`Clip "${clip.id}" has a bad range (in ${clip.in}, out ${clip.out}). Out must be after In.`);
+  }
   return Math.max(1, Math.round((clip.out - clip.in) * fps));
+}
+
+// The UI rounds times to milliseconds, so an out point can be up to 0.5 ms past the end.
+const END_TOLERANCE = 0.001;
+
+/**
+ * Checks a project before Vida saves, opens, or renders it.
+ * Returns a list of error messages. An empty list means the project is valid.
+ * A source marked `missing` (file not found) may have no duration; its clips
+ * are not checked against the media length.
+ */
+export function validateProject(project) {
+  const errors = [];
+  if (!project || typeof project !== 'object') return ['The project is not a JSON object.'];
+  const { sources, sequence, output } = project;
+  if (!Array.isArray(sources)) errors.push('"sources" must be a list.');
+  if (!Array.isArray(sequence)) errors.push('"sequence" must be a list.');
+  if (errors.length) return errors;
+  const isNum = (n) => typeof n === 'number' && Number.isFinite(n);
+  const t = (n) => (isNum(n) ? n.toFixed(3) : JSON.stringify(n));
+
+  const byId = new Map();
+  sources.forEach((s, i) => {
+    const where = `sources[${i}]`;
+    if (!s || typeof s !== 'object') return errors.push(`${where} is not an object.`);
+    if (typeof s.id !== 'string' || !s.id) return errors.push(`${where} needs a non-empty string "id".`);
+    if (byId.has(s.id)) errors.push(`${where}: the id "${s.id}" is used by more than one source.`);
+    byId.set(s.id, s);
+    if (typeof s.path !== 'string' || !s.path) errors.push(`${where} ("${s.id}") needs a "path" to the video file.`);
+    if (!s.missing && !(isNum(s.duration) && s.duration > 0)) {
+      errors.push(`${where} ("${s.id}"): duration ${t(s.duration)} is not a positive number of seconds.`);
+    }
+    const segments = s.transcript && s.transcript.segments;
+    if (s.transcript != null && !Array.isArray(segments)) errors.push(`${where} ("${s.id}"): transcript.segments must be a list.`);
+    (Array.isArray(segments) ? segments : []).forEach((g, k) => {
+      if (!g || !isNum(g.start) || !isNum(g.end) || g.end < g.start || typeof g.text !== 'string') {
+        errors.push(`${where} ("${s.id}"): transcript.segments[${k}] needs numbers start <= end and a string text.`);
+      }
+    });
+  });
+
+  const clipIds = new Set();
+  sequence.forEach((c, i) => {
+    const where = `sequence[${i}]`;
+    if (!c || typeof c !== 'object') return errors.push(`${where} is not an object.`);
+    const label = `${where} (id ${JSON.stringify(c.id)})`;
+    if (typeof c.id !== 'string' || !c.id) errors.push(`${where} needs a non-empty string "id".`);
+    else if (clipIds.has(c.id)) errors.push(`${label}: the id is used by more than one clip.`);
+    clipIds.add(c.id);
+    const src = byId.get(c.sourceId);
+    if (!src) {
+      errors.push(`${label}: sourceId ${JSON.stringify(c.sourceId)} is not in "sources". Known ids: ${[...byId.keys()].join(', ') || 'none'}.`);
+    }
+    if (!isNum(c.in) || !isNum(c.out)) return errors.push(`${label}: "in" and "out" must be finite numbers of seconds (got in ${t(c.in)}, out ${t(c.out)}).`);
+    if (c.in < 0) errors.push(`${label}: in ${t(c.in)} is before the start of the source (0).`);
+    if (c.out <= c.in) errors.push(`${label}: out ${t(c.out)} is not after in ${t(c.in)}. Swap them or fix the range.`);
+    else if (c.out - c.in < MIN_CLIP - 1e-9) errors.push(`${label}: the clip is ${t(c.out - c.in)} s long. The minimum is ${MIN_CLIP} s.`);
+    if (src && !src.missing && isNum(src.duration) && c.out > src.duration + END_TOLERANCE) {
+      errors.push(`${label}: out ${t(c.out)} is past the end of "${src.name || src.id}" (${t(src.duration)} s).`);
+    }
+  });
+
+  const o = output || {};
+  for (const key of ['width', 'height', 'fps']) {
+    if (o[key] != null && !(isNum(o[key]) && o[key] > 0)) errors.push(`output.${key} must be a positive number or null (got ${JSON.stringify(o[key])}).`);
+  }
+  return errors;
+}
+
+/** Throws one error that lists every problem in the project. */
+export function assertValidProject(project) {
+  const errors = validateProject(project);
+  if (errors.length) {
+    throw Object.assign(new Error(`The project is not valid:\n- ${errors.join('\n- ')}`), { status: 422, errors });
+  }
 }
 
 /**

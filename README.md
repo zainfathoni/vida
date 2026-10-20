@@ -47,6 +47,26 @@ The server listens on `127.0.0.1` only. Stop it with Ctrl+C.
 
 To correct transcript text, double-click a line, type, and press Enter. The export uses the corrected text.
 
+### When the project file changes on disk
+
+Another program or an agent can change the project file while it is open in Vida. Vida checks the file every 2 seconds. When the file changed, a bar shows **Reload from disk**, **Save as…**, and **Keep editing**. After a reload, **Undo** brings back the version that you had before.
+
+**Save** fails when the file on disk is not the file that your version is based on, also after Undo goes back to a version from before a reload. The file on disk stays the same. To keep your version, click **Save as…**, or **Replace the file on disk** in the bar.
+
+This check is not a file lock. A change that another program writes in the few milliseconds while Vida saves can be lost. Agents must write their edits to a new draft file (see [docs/agent-workflow.md](docs/agent-workflow.md)).
+
+## Command line and agents
+
+You can check and render a project without the browser:
+
+```sh
+node bin/vida.js validate "Episode 12.vida.json"
+node bin/vida.js captions "Episode 12.vida.json"
+node bin/vida.js export   "Episode 12.vida.json" --out exports/episode-12.mp4
+```
+
+An agent can write a `.vida.json` file, validate it, render it, and give it to you to review in Vida. See [docs/agent-workflow.md](docs/agent-workflow.md) for the project format and the workflow, and [AGENTS.md](AGENTS.md) for the rules that agents follow.
+
 ### Keyboard
 
 | Key | Action |
@@ -103,7 +123,8 @@ Vida sends 20-minute parts, so each upload stays below the 25 MB limit.
 
 - `server/` is a small Node HTTP server. It lists folders, reads media facts with `ffprobe`, streams source files to the browser, runs transcription, saves projects, and runs FFmpeg for export.
 - `public/` is the browser app (plain JavaScript, no build step).
-- `public/lib/timeline.js` has the timeline rules. The preview and the export both use it, so they agree.
+- `public/lib/timeline.js` has the timeline rules and the project validation. The preview, the export, and `bin/vida.js` all use it, so they agree.
+- `bin/vida.js` is the command line tool (`validate`, `captions`, `export`).
 
 ### Timing rules
 
@@ -124,13 +145,13 @@ Browsers cannot play some camera files, for example HEVC (H.265) or 10-bit video
 
 ### Project file
 
-A `.vida.json` file contains the source paths (absolute and relative to the project file), media facts, transcripts, the sequence, and output settings. If you move the project folder together with the videos, Vida finds the videos by the relative path. If a file is missing, the source shows **file missing** and **Find file…**.
+A `.vida.json` file contains the source paths (absolute and relative to the project file), media facts, transcripts, the sequence, and output settings. [docs/agent-workflow.md](docs/agent-workflow.md) describes each field and the validation rules. Vida does not open, save, or export a project with a bad clip, for example a clip with Out before In, a clip past the end of its video, or a clip that refers to a source that is not in the project. The error names the clip. If you move the project folder together with the videos, Vida finds the videos by the relative path. If a file is missing, the source shows **file missing** and **Find file…**.
 
 ## Tests
 
 ```sh
 npm test            # timeline unit tests (fast)
-npm run test:e2e    # makes test videos with FFmpeg, exports a sequence, and measures it (about 1 minute)
+npm run test:e2e    # makes test videos with FFmpeg, exports sequences, and measures them (about 1 minute)
 node --test test/whisper.test.js   # optional, needs whisper.cpp settings
 ```
 
@@ -142,7 +163,10 @@ The end-to-end test makes three videos with different sizes, frame rates, codecs
 - that the clip from the source without audio is silent,
 - that the SRT and VTT cues have the remapped times and that speech is under each cue,
 - that a saved project opens again, also after you move the folder,
-- that the source files do not change.
+- that the source files do not change,
+- that `bin/vida.js` validates, captions, and exports a hand-written project with boundary cuts from three sources, and refuses bad cuts without writing files,
+- that a save does not replace a project file that changed on disk, and that Undo across a reload keeps the old revision,
+- that the HTTP save, captions, and export routes use the real media length, not a duration or `missing` value from the request.
 
 ## Limits
 

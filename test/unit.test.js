@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildPlan, locate, remapCaptions, groupWords, toSRT, toVTT, parseSubtitles,
-  formatTimestamp, parseClock, transcriptRows, resolveOutput, snapFps,
+  formatTimestamp, parseClock, transcriptRows, resolveOutput, snapFps, validateProject,
 } from '../public/lib/timeline.js';
+import { History } from '../public/lib/history.js';
 
 const close = (a, b, eps = 1e-9) => assert.ok(Math.abs(a - b) < eps, `${a} != ${b}`);
 
@@ -128,4 +129,66 @@ test('output settings and frame rate snapping', () => {
   assert.equal(snapFps(29.97), 29.97);
   assert.equal(snapFps(24.02), 24);
   assert.equal(snapFps(12.5), 12.5);
+});
+
+test('validation accepts boundary cuts from several sources', () => {
+  const sources = [
+    { id: 'A', path: '/v/a.mp4', name: 'a.mp4', duration: 24 },
+    { id: 'B', path: '/v/b.mp4', name: 'b.mp4', duration: 16.4 },
+  ];
+  const sequence = [
+    { id: 'c1', sourceId: 'B', in: 10.2, out: 16.4 }, // out exactly at the end
+    { id: 'c2', sourceId: 'A', in: 0, out: 0.1 }, // in at 0, exactly the minimum length
+    { id: 'c3', sourceId: 'B', in: 0.7, out: 16.4004 }, // UI millisecond rounding past the end
+    { id: 'c4', sourceId: 'A', in: 6, out: 8.9 },
+  ];
+  assert.deepEqual(validateProject({ sources, sequence, output: { width: null, fps: 30 } }), []);
+  // A missing file has no duration to check against.
+  assert.deepEqual(validateProject({ sources: [{ id: 'M', path: '/gone.mp4', missing: true }], sequence: [{ id: 'x', sourceId: 'M', in: 1, out: 99 }] }), []);
+});
+
+test('validation rejects bad cuts and names the clip', () => {
+  const sources = [{ id: 'A', path: '/v/a.mp4', name: 'a.mp4', duration: 24 }];
+  const check = (clip) => validateProject({ sources, sequence: [{ id: 'k', sourceId: 'A', in: 1, out: 2, ...clip }] });
+  const one = (clip, pattern) => {
+    const errors = check(clip);
+    assert.equal(errors.length, 1, errors.join('\n'));
+    assert.match(errors[0], pattern);
+    assert.match(errors[0], /"k"/);
+  };
+  one({ in: 5, out: 4 }, /out 4\.000 is not after in 5\.000/);
+  one({ in: 5, out: 5 }, /not after in/);
+  one({ out: 24.01 }, /past the end of "a\.mp4" \(24\.000 s\)/);
+  one({ in: -0.5 }, /before the start/);
+  one({ in: 1, out: 1.09 }, /minimum is 0\.1 s/);
+  one({ in: NaN }, /finite numbers/);
+  one({ out: '2' }, /finite numbers/);
+  one({ out: null }, /finite numbers/);
+  one({ sourceId: 'Z' }, /sourceId "Z" is not in "sources"\. Known ids: A/);
+  const dup = validateProject({ sources: [...sources, { ...sources[0] }], sequence: [{ id: 'k', sourceId: 'A', in: 0, out: 1 }, { id: 'k', sourceId: 'A', in: 1, out: 2 }] });
+  assert.equal(dup.length, 2);
+  assert.match(validateProject({ sources: [{ id: 'A', path: '/a.mp4' }], sequence: [] })[0], /duration/);
+  assert.match(validateProject({ sources: [], sequence: {} })[0], /"sequence" must be a list/);
+  // The export plan refuses a reversed cut instead of making it one frame long.
+  assert.throws(() => buildPlan([{ id: 'r', sourceId: 'A', in: 5, out: 4 }], 30), /Clip "r" has a bad range/);
+});
+
+test('undo across a reload returns the old revision, so a normal save is stale', () => {
+  // R1: the file Vida opened. D: the file after an agent changed it. R2, R3: files that Vida wrote.
+  const h = new History();
+  h.record({ json: 'v0', revision: 'R1' }); // an edit made after opening R1
+  h.record({ json: 'v1', revision: 'R1' }); // Reload from disk: the unsaved version v1 is based on R1
+  // Vida now shows D. Undo returns v1 with R1, not with D.
+  assert.deepEqual(h.undo({ json: 'disk', revision: 'D' }), { json: 'v1', revision: 'R1' });
+  // Redo returns the disk version with D.
+  assert.deepEqual(h.redo({ json: 'v1', revision: 'R1' }), { json: 'disk', revision: 'D' });
+  // Vida saves an edit on top of D (D -> R2). Entries based on D move to R2; entries from before the reload do not.
+  h.record({ json: 'disk', revision: 'D' });
+  h.saved('D', 'R2');
+  assert.deepEqual(h.undo({ json: 'v2', revision: 'R2' }), { json: 'disk', revision: 'R2' });
+  assert.deepEqual(h.undo({ json: 'disk', revision: 'R2' }), { json: 'v1', revision: 'R1' });
+  // Save as to another file: every entry belongs to the new file.
+  h.saved('R1', 'R3', { otherFile: true });
+  assert.deepEqual(h.undo({ json: 'v1', revision: 'R3' }), { json: 'v0', revision: 'R3' });
+  assert.deepEqual(h.redo({ json: 'v0', revision: 'R3' }), { json: 'v1', revision: 'R3' });
 });

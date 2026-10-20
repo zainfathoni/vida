@@ -5,11 +5,13 @@
   "type": "module",
   "private": true,
   "engines": { "node": ">=20" },
+  "bin": { "vida": "bin/vida.js" },
   "scripts": {
     "start": "node server/index.js --open",
     "serve": "node server/index.js",
     "test": "node --test test/unit.test.js",
     "test:e2e": "node --test test/e2e.test.js",
-    "fixtures": "node scripts/make-fixtures.js fixtures"
+    "fixtures": "node scripts/make-fixtures.js fixtures",
+    "vida": "node bin/vida.js"
   }
 }

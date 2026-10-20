@@ -8,7 +8,7 @@ import { startJob, getJob, cancelJob } from './jobs.js';
 import { probe, makeProxy, proxyPathFor, VIDEO_EXTENSIONS } from './media.js';
 import { transcribe } from './transcribe.js';
 import { exportProject, writeCaptions } from './export.js';
-import { saveProject, openProject, PROJECT_EXT } from './project.js';
+import { saveProject, loadProject, projectRevision, PROJECT_EXT } from './project.js';
 import { parseSubtitles } from '../public/lib/timeline.js';
 
 const PUBLIC_DIR = path.join(APP_DIR, 'public');
@@ -150,28 +150,23 @@ const routes = {
     });
   },
   'POST /api/project/save': async (req) => {
-    const { file, project } = await readJson(req);
-    saveProject(path.resolve(file), project);
-    return { ok: true, file: path.resolve(file) };
+    const { file, project, baseRevision, overwrite } = await readJson(req);
+    const saved = await saveProject(path.resolve(file), project, { baseRevision, overwrite: overwrite === true });
+    return { ok: true, file: path.resolve(file), revision: saved.revision };
   },
+  'GET /api/project/revision': async (req, url) => ({ revision: projectRevision(path.resolve(url.searchParams.get('file') || '')) }),
   'POST /api/project/open': async (req) => {
     const { file } = await readJson(req);
-    const project = openProject(path.resolve(file));
+    const project = await loadProject(path.resolve(file));
     for (const s of project.sources) {
       if (s.missing) continue;
       allow(s.path);
-      try {
-        const info = await probe(s.path);
-        s.needsProxy = info.needsProxy;
-        if (info.needsProxy && fs.existsSync(proxyPathFor(s.path))) {
-          s.proxyPath = proxyPathFor(s.path);
-          allow(s.proxyPath);
-        }
-      } catch {
-        s.missing = true;
+      if (s.needsProxy && fs.existsSync(proxyPathFor(s.path))) {
+        s.proxyPath = proxyPathFor(s.path);
+        allow(s.proxyPath);
       }
     }
-    return { file: path.resolve(file), project };
+    return { file: path.resolve(file), project, revision: project.revision };
   },
   'POST /api/transcribe': async (req) => {
     const { provider, source } = await readJson(req);
@@ -190,7 +185,7 @@ const routes = {
   },
   'POST /api/captions': async (req) => {
     const { project, file } = await readJson(req);
-    return writeCaptions(project, path.resolve(file).replace(/\.(mp4|srt|vtt)$/i, ''));
+    return await writeCaptions(project, path.resolve(file).replace(/\.(mp4|srt|vtt)$/i, ''));
   },
 };
 
@@ -218,7 +213,7 @@ const server = http.createServer(async (req, res) => {
     if (!file.startsWith(PUBLIC_DIR + path.sep)) return send(res, 403, 'Forbidden');
     return serveFile(req, res, file);
   } catch (err) {
-    send(res, err.status || 400, { error: err.message || String(err) });
+    send(res, err.status || 400, { error: err.message || String(err), code: err.code });
   }
 });
 

@@ -56,6 +56,11 @@ h3 { margin: 0 0 12px; }
 .job .bar { width: 80px; height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; }
 .job .bar div { height: 100%; background: var(--accent); }
 .job.error { color: var(--err); }
+.disk-banner {
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+  background: #3a2f17; border-bottom: 1px solid var(--warn); color: #ffe2a8;
+}
+.disk-banner span { margin-right: auto; }
 
 .layout {
   flex: 1; min-height: 0; display: grid; gap: 1px; background: var(--line);

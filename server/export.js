@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildPlan, planDuration, remapCaptions, resolveOutput, toSRT, toVTT } from '../public/lib/timeline.js';
+import { assertValidProject, buildPlan, planDuration, remapCaptions, resolveOutput, toSRT, toVTT } from '../public/lib/timeline.js';
 import { runFfmpeg } from './media.js';
+import { checkMedia } from './project.js';
 
 const AUDIO_RATE = 48000;
 
@@ -57,6 +58,7 @@ function transcriptsOf(project) {
 }
 
 export function captionFiles(project) {
+  assertValidProject(project);
   const { fps } = resolveOutput(project);
   const cues = remapCaptions(buildPlan(project.sequence, fps), transcriptsOf(project));
   return { cues, srt: toSRT(cues), vtt: toVTT(cues) };
@@ -70,7 +72,8 @@ function assertSafeOutput(project, file) {
 }
 
 /** Writes base.srt and base.vtt next to the video. */
-export function writeCaptions(project, base) {
+export async function writeCaptions(project, base) {
+  project = await checkMedia(project, { requireMedia: true });
   const { cues, srt, vtt } = captionFiles(project);
   for (const ext of ['.srt', '.vtt']) assertSafeOutput(project, base + ext);
   fs.mkdirSync(path.dirname(base), { recursive: true });
@@ -80,6 +83,7 @@ export function writeCaptions(project, base) {
 }
 
 export async function exportProject(project, outFile, job) {
+  project = await checkMedia(project, { requireMedia: true });
   if (!project.sequence.length) throw new Error('The sequence is empty.');
   if (!/\.mp4$/i.test(outFile)) throw new Error('The output file name must end with .mp4.');
   assertSafeOutput(project, outFile);
@@ -96,6 +100,6 @@ export async function exportProject(project, outFile, job) {
     throw err;
   }
   fs.renameSync(outFile + '.part.mp4', outFile);
-  const captions = writeCaptions(project, outFile.replace(/\.mp4$/i, ''));
+  const captions = await writeCaptions(project, outFile.replace(/\.mp4$/i, ''));
   return { video: outFile, ...captions, duration: total, settings };
 }
