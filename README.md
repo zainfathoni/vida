@@ -14,16 +14,19 @@ With Vida, you can:
 
 Vida runs on your computer. It has no accounts, no cloud storage, and no publishing. It does not do multicam, automatic vertical crops, or motion graphics.
 
+> **Status: experimental.** Vida was tested only on Linux, in Chromium, with generated test videos. It was not tested on macOS, Windows, or Safari, or with real camera and screen recordings. Keep backups of your project files.
+
 ## Requirements
 
 - Node.js 20 or newer. Vida has no npm dependencies.
 - FFmpeg with `ffprobe`. On macOS: `brew install ffmpeg`.
-- A Chromium-based browser or Safari.
+- A Chromium-based browser. Other browsers can work, but they are not tested.
 - Optional: whisper.cpp for local transcription (see below).
 
 ## Start
 
 ```sh
+git clone https://github.com/zainfathoni/vida.git
 cd vida
 npm start          # starts the server and opens http://localhost:5178/
 ```
@@ -31,6 +34,12 @@ npm start          # starts the server and opens http://localhost:5178/
 To start without opening a browser, use `npm run serve`. To use a different port, set `PORT=5200`.
 
 The server listens on `127.0.0.1` only. Stop it with Ctrl+C.
+
+### Security
+
+- Other computers cannot connect to Vida. The server accepts only requests to `localhost` and `127.0.0.1`. A web page from another site cannot read its data or start an export.
+- Any program that runs on your computer can use the Vida server while it runs. The server can list your folders, read video and subtitle files, and write export, caption, and project files to any folder that your user account can write to. Run Vida only on a computer that you trust, and stop it when you do not use it.
+- Vida does not change or delete source videos.
 
 ## Workflow
 
@@ -189,7 +198,9 @@ The end-to-end test makes three videos with different sizes, frame rates, codecs
 - Variable frame rate sources are converted to a constant frame rate at export.
 - No audio level controls, no transitions, no AI suggestions.
 - Undo history is not saved with the project.
-- Tests used generated videos only. Tests with real Screen Studio and DJI Pocket recordings are still necessary.
+- Tests used generated videos only, on Linux and in Chromium. Tests with real Screen Studio and DJI Pocket recordings, on macOS, and in Safari are still necessary.
+- The hosted transcription option was tested only with a mock API, not with a real provider.
+- The check for project file changes on disk is not a file lock (see "When the project file changes on disk").
 
 ## Licence
 
