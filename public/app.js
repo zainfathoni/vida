@@ -1,6 +1,6 @@
 import {
   buildPlan, planDuration, locate, remapCaptions, resolveOutput, transcriptRows,
-  formatClock, parseClock, MIN_CLIP,
+  formatClock, parseClock, MIN_CLIP, editWord,
 } from './lib/timeline.js';
 import { History } from './lib/history.js';
 
@@ -543,10 +543,12 @@ function renderTranscript() {
       if (tx.isContentEditable) return;
       if (e.shiftKey && state.transcriptSel) state.transcriptSel.focus = i;
       else state.transcriptSel = { anchor: i, focus: i };
-      sv.currentTime = row.start;
+      sv.currentTime = e.wordStart ?? row.start;
       applyTranscriptSel();
     };
-    if (!row.gap) {
+    if (!row.gap && row.segment.words && row.segment.words.length) {
+      renderWords(tx, row.segment);
+    } else if (!row.gap) {
       tx.ondblclick = (e) => {
         e.stopPropagation();
         tx.contentEditable = 'true';
@@ -576,6 +578,60 @@ function renderTranscript() {
     list.append(li);
   });
   renderTranscriptSel();
+}
+
+/** A line with word times: each word can be corrected or turned off without losing its time. */
+function renderWords(tx, segment) {
+  tx.replaceChildren();
+  segment.words.forEach((w, k) => {
+    if (k) tx.append(' ');
+    const span = el('span', {
+      className: `word${w.off ? ' off' : ''}`,
+      textContent: w.text,
+      title: `${formatClock(w.start)}–${formatClock(w.end)}. Double-click to correct. Alt+click to turn ${w.off ? 'on' : 'off'} in captions.`,
+    });
+    span.onclick = (e) => {
+      if (span.isContentEditable) return e.stopPropagation();
+      if (e.altKey) {
+        e.stopPropagation();
+        checkpoint();
+        if (w.off) delete w.off;
+        else w.off = true;
+        changed({ timeline: false });
+        return;
+      }
+      e.wordStart = w.start;
+    };
+    span.ondblclick = (e) => {
+      e.stopPropagation();
+      span.contentEditable = 'true';
+      span.focus();
+      getSelection().selectAllChildren(span);
+    };
+    span.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        span.blur();
+      }
+      if (e.key === 'Escape') {
+        span.textContent = w.text;
+        span.blur();
+      }
+    };
+    span.onblur = () => {
+      span.contentEditable = 'false';
+      const text = span.textContent.trim();
+      if (text === w.text) return;
+      const before = JSON.stringify(project());
+      if (!editWord(segment, k, text)) {
+        span.textContent = w.text;
+        return toast('A line needs at least one word. To hide it in the captions, Alt+click the word.', true);
+      }
+      state.history.record({ json: before, revision: state.revision });
+      changed({ timeline: false });
+    };
+    tx.append(span);
+  });
 }
 
 function selRange() {

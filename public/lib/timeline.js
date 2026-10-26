@@ -69,6 +69,8 @@ export function validateProject(project) {
     (Array.isArray(segments) ? segments : []).forEach((g, k) => {
       if (!g || !isNum(g.start) || !isNum(g.end) || g.end < g.start || typeof g.text !== 'string') {
         errors.push(`${where} ("${s.id}"): transcript.segments[${k}] needs numbers start <= end and a string text.`);
+      } else if (g.words != null && (!Array.isArray(g.words) || g.words.some((w) => !w || !isNum(w.start) || !isNum(w.end) || w.end < w.start || typeof w.text !== 'string' || (w.off != null && typeof w.off !== 'boolean')))) {
+        errors.push(`${where} ("${s.id}"): transcript.segments[${k}].words must be a list of { start, end, text, off? } with numbers start <= end.`);
       }
     });
   });
@@ -151,6 +153,29 @@ export function locate(plan, t) {
 
 const DEFAULT_GROUP = { maxChars: 84, maxDuration: 6, maxGap: 0.7 };
 
+/**
+ * Replaces word k of a transcript segment with the words in `text`.
+ * One word keeps the time of the old word. Several words share its time
+ * evenly. Empty text removes the word. The segment text follows the words.
+ * Returns false if the change would remove the last word.
+ */
+export function editWord(segment, k, text) {
+  const old = segment.words[k];
+  const parts = String(text).trim().split(/\s+/).filter(Boolean);
+  if (!parts.length && segment.words.length === 1) return false;
+  const step = (old.end - old.start) / Math.max(1, parts.length);
+  const round = (t) => Math.round(t * 1000) / 1000;
+  const words = parts.map((t, i) => ({
+    ...(parts.length === 1 ? old : old.off ? { off: true } : {}),
+    start: parts.length === 1 ? old.start : round(old.start + i * step),
+    end: parts.length === 1 ? old.end : i === parts.length - 1 ? old.end : round(old.start + (i + 1) * step),
+    text: t,
+  }));
+  segment.words.splice(k, 1, ...words);
+  segment.text = segment.words.map((w) => w.text).join(' ');
+  return true;
+}
+
 /** Groups timed words into caption-sized segments. */
 export function groupWords(words, opts = {}) {
   const o = { ...DEFAULT_GROUP, ...opts };
@@ -185,7 +210,8 @@ export function groupWords(words, opts = {}) {
 /**
  * Maps source transcripts into the final sequence.
  * transcripts: { [sourceId]: { segments: [{start, end, text, words?}] } }
- * Words are kept only when their midpoint is inside the clip. Segments without
+ * Words are kept only when their midpoint is inside the clip and they are not
+ * turned off (off: true). Segments without
  * word timing are kept when at least 0.25 s of them is inside the clip.
  * A cue never crosses a cut.
  */
@@ -200,6 +226,7 @@ export function remapCaptions(plan, transcripts, opts = {}) {
       if (seg.end <= p.in || seg.start >= p.out) continue;
       if (seg.words && seg.words.length) {
         for (const w of seg.words) {
+          if (w.off) continue; // the person turned this word off in the captions
           const mid = (w.start + w.end) / 2;
           if (mid >= p.in && mid < p.out) words.push({ start: toSeq(w.start), end: toSeq(w.end), text: w.text });
         }

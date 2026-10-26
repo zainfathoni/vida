@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildPlan, locate, remapCaptions, groupWords, toSRT, toVTT, parseSubtitles,
-  formatTimestamp, parseClock, transcriptRows, resolveOutput, snapFps, validateProject,
+  formatTimestamp, parseClock, transcriptRows, resolveOutput, snapFps, validateProject, editWord,
 } from '../public/lib/timeline.js';
 import { History } from '../public/lib/history.js';
 
@@ -191,4 +191,42 @@ test('undo across a reload returns the old revision, so a normal save is stale',
   h.saved('R1', 'R3', { otherFile: true });
   assert.deepEqual(h.undo({ json: 'v1', revision: 'R3' }), { json: 'v0', revision: 'R3' });
   assert.deepEqual(h.redo({ json: 'v0', revision: 'R3' }), { json: 'v1', revision: 'R3' });
+});
+
+test('word fixes keep word times, and words that are off leave the captions', () => {
+  const seg = {
+    start: 10, end: 12, text: 'so um this works',
+    words: [
+      { start: 10, end: 10.4, text: 'so' },
+      { start: 10.5, end: 10.9, text: 'um' },
+      { start: 11, end: 11.3, text: 'this' },
+      { start: 11.4, end: 12, text: 'works' },
+    ],
+  };
+  // Correct one word: the time stays.
+  assert.equal(editWord(seg, 3, 'worked'), true);
+  assert.deepEqual(seg.words[3], { start: 11.4, end: 12, text: 'worked' });
+  // One word becomes three: they share the old time, without gaps or overlap.
+  editWord(seg, 2, 'all of this');
+  assert.deepEqual(seg.words.slice(2, 5).map((w) => [w.start, w.end, w.text]), [[11, 11.1, 'all'], [11.1, 11.2, 'of'], [11.2, 11.3, 'this']]);
+  assert.equal(seg.text, 'so um all of this worked');
+  // Empty text removes a word, but never the last word of a line.
+  editWord(seg, 0, '  ');
+  assert.equal(seg.text, 'um all of this worked');
+  assert.equal(editWord({ text: 'a', words: [{ start: 0, end: 1, text: 'a' }] }, 0, ''), false);
+
+  // "um" is off. The clip starts 9 s into the source, at sequence time 0.
+  seg.words[0].off = true;
+  const plan = buildPlan([{ id: 'c', sourceId: 'S', in: 9, out: 13 }], 30);
+  const cues = remapCaptions(plan, { S: { segments: [seg] } });
+  assert.deepEqual(cues.map((c) => c.text), ['all of this worked']);
+  close(cues[0].start, 2); // starts at "all" (11 s), not at "um" (10.5 s)
+  close(cues[0].end, 3);
+});
+
+test('validation checks transcript words', () => {
+  const project = (words) => ({ sources: [{ id: 'A', path: '/a.mp4', duration: 5, transcript: { segments: [{ start: 0, end: 1, text: 'hi', words }] } }], sequence: [] });
+  assert.deepEqual(validateProject(project([{ start: 0, end: 1, text: 'hi', off: true }])), []);
+  assert.match(validateProject(project([{ start: 1, end: 0, text: 'hi' }]))[0], /words must be a list/);
+  assert.match(validateProject(project([{ start: 0, end: 1, text: 'hi', off: 'yes' }]))[0], /words must be a list/);
 });

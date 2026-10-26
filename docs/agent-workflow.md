@@ -102,7 +102,7 @@ Vida checks the project file on disk every 2 seconds and when the window gets fo
 | `transcript` | no | `{ provider, model?, createdAt?, segments }`. `provider` is `"whisper.cpp"`, `"openai"`, or `"imported"`. |
 | `duration`, `width`, `height`, `fps`, `vcodec`, `pixFmt`, `hasAudio`, `acodec`, `size` | no | Media facts. Vida does not trust these values. Before it opens, saves, makes captions, or exports (in the commands and in the HTTP API), it reads every source file again with ffprobe and uses the facts of the file on disk. A `missing` value in the file is also ignored: a source is missing only if its file is not found. |
 
-Transcript segments: `start` and `end` are seconds in the source video, `text` is a string, and `words` (optional) is a list of `{ start, end, text }`. Without `words`, a caption line is cut to the clip and kept when at least 0.25 s of it is inside the clip. With `words`, a word is kept when its middle is inside the clip.
+Transcript segments: `start` and `end` are seconds in the source video, `text` is a string, and `words` (optional) is a list of `{ start, end, text, off }`. `off: true` removes that word from the captions; the word stays in the transcript. An agent can set `off` to remove filler words from the captions. It must not change word times or invent words. Without `words`, a caption line is cut to the clip and kept when at least 0.25 s of it is inside the clip. With `words`, a word is kept when its middle is inside the clip.
 
 ### Clips (`sequence`)
 
@@ -124,7 +124,7 @@ Vida checks these rules before it opens, saves, or renders a project. The error 
 - `0 ≤ in`, and `out` is after `in` by at least 0.1 s (the shortest clip that the editor makes).
 - `out` is not more than 1 ms past the end of the source file.
 - `output.width`, `output.height`, and `output.fps` are positive numbers or `null`.
-- Transcript segments have numbers `start ≤ end` and a string `text`.
+- Transcript segments have numbers `start ≤ end` and a string `text`. Each word has numbers `start ≤ end`, a string `text`, and an optional boolean `off`.
 
 A source whose file is not found is allowed when you open or save the project in Vida (the source shows **file missing** and **Find file…**, so the person can relink it). Captions and export fail if a clip uses such a source.
 

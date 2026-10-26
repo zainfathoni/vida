@@ -45,7 +45,11 @@ The server listens on `127.0.0.1` only. Stop it with Ctrl+C.
 7. Click **Save** (Ctrl+S). Project files end with `.vida.json`.
 8. Click **Export…**. Select the size and frame rate, and click **Export video and captions**.
 
-To correct transcript text, double-click a line, type, and press Enter. The export uses the corrected text.
+To correct transcript text, double-click it, type, and press Enter. The export uses the corrected text.
+
+- In a line with word times (whisper.cpp or the API), each word is separate. Double-click a word to correct it. The word keeps its time. If you type more than one word, the new words share the time of the old word. Clear the text to delete the word.
+- Alt+click (Option+click on a Mac) a word to turn it off in the captions, for example a filler word. The word stays in the transcript, struck through. Alt+click it again to turn it on.
+- In a line without word times (imported SRT/VTT), double-click the line to correct the whole line.
 
 ### When the project file changes on disk
 

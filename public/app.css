@@ -124,6 +124,10 @@ h3 { margin: 0 0 12px; }
 .transcript-list li.selected { background: var(--sel); }
 .transcript-list .ts { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; padding-top: 1px; }
 .transcript-list li.gap .tx { color: #7e8596; font-style: italic; }
+.transcript-list .word { border-radius: 3px; }
+.transcript-list .word:hover { background: #2c313c; }
+.transcript-list .word.off { text-decoration: line-through; color: #7e8596; }
+.transcript-list .word[contenteditable=true] { outline: 1px solid var(--accent); background: #12141a; padding: 0 3px; cursor: text; }
 .transcript-list .tx[contenteditable=true] { outline: 1px solid var(--accent); background: #12141a; border-radius: 3px; padding: 0 3px; cursor: text; }
 .sel-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); background: #1a2232; font-size: 12px; }
 
