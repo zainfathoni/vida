@@ -74,7 +74,12 @@ An agent can write a `.vida.json` file, validate it, render it, and give it to y
 | Space | Play or pause the last-used view |
 | I / O | Mark In / Out in the source view |
 | A | Add the marked range to the sequence |
-| ← / → | One frame back / forward (source view). Shift: one second |
+| J / K / L | Back one second / pause / play (the last-used view). Browsers cannot play video in reverse |
+| ← / → | One frame back / forward in the last-used view. Shift: one second |
+| ↑ / ↓ | Select the previous / next clip and move the sequence preview to its start |
+| X | Select the clip at the sequence preview playhead |
+| [ / ] | Move In / Out of the selected clip to the sequence preview playhead |
+| S | Split the selected clip at the sequence preview playhead |
 | Delete | Remove the selected clip |
 | Ctrl+S / Ctrl+Shift+S | Save / Save as |
 | Ctrl+Z / Ctrl+Shift+Z | Undo / Redo |

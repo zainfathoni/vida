@@ -963,21 +963,57 @@ function removeClip() {
   changed();
 }
 
-function splitClip() {
+/** The selected clip and the source time at the preview playhead, if the playhead is inside it. */
+function playheadInSelectedClip() {
   const seq = project().sequence;
   const i = seq.findIndex((c) => c.id === state.selectedClipId);
   const p = program.plan[i];
-  if (i < 0 || !p) return;
+  if (i < 0 || !p) {
+    toast('Select a clip first (click it, or press X).', true);
+    return null;
+  }
   const at = p.in + (program.t - p.offset);
   if (program.index !== i || at - p.in < MIN_CLIP || seq[i].out - at < MIN_CLIP) {
-    return toast('Move the preview playhead inside the selected clip first.', true);
+    toast('Move the preview playhead inside the selected clip first.', true);
+    return null;
   }
+  return { i, clip: seq[i], entry: p, at };
+}
+
+function splitClip() {
+  const hit = playheadInSelectedClip();
+  if (!hit) return;
+  const { i, clip, at } = hit;
+  const seq = project().sequence;
   checkpoint();
-  const clip = seq[i];
   const second = { id: uid('c'), sourceId: clip.sourceId, in: round3(at), out: clip.out };
   clip.out = round3(at);
   seq.splice(i + 1, 0, second);
   changed();
+}
+
+/** [ and ]: the selected clip starts or ends at the preview playhead. */
+function trimToPlayhead(edge) {
+  const hit = playheadInSelectedClip();
+  if (!hit) return;
+  checkpoint();
+  hit.clip[edge] = round3(hit.at);
+  // After a trim of the start, the playhead shows the new first frame of the clip.
+  if (edge === 'in') program.t = hit.entry.offset;
+  changed();
+}
+
+/** ↑ and ↓: select the previous or next clip and move the preview playhead to its start. */
+function selectNearClip(delta) {
+  const seq = project().sequence;
+  if (!seq.length) return;
+  const i = seq.findIndex((c) => c.id === state.selectedClipId);
+  const from = i < 0 ? Math.max(0, program.index) - (delta > 0 ? 1 : 0) : i;
+  const j = Math.max(0, Math.min(seq.length - 1, from + delta));
+  selectClip(seq[j].id);
+  program.seek(program.plan[j].offset, { keepPlaying: program.playing });
+  const node = document.querySelector(`#track .clip[data-id="${seq[j].id}"]`);
+  if (node) node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
 function setClipEdge(clip, edge, value) {
@@ -997,7 +1033,7 @@ function renderInspector() {
   const seq = project().sequence;
   const i = seq.findIndex((c) => c.id === state.selectedClipId);
   if (i < 0) {
-    box.append(el('span', { className: 'hint', textContent: seq.length ? 'Select a clip to trim, move, split, or remove it. Drag clips to change the order.' : 'Mark In and Out in the source view, or select transcript lines, then add the range to the sequence.' }));
+    box.append(el('span', { className: 'hint', textContent: seq.length ? 'Select a clip to trim, move, split, or remove it (↑/↓ or X). Drag clips to change the order.' : 'Mark In and Out in the source view, or select transcript lines, then add the range to the sequence.' }));
     return;
   }
   const clip = seq[i];
@@ -1014,7 +1050,7 @@ function renderInspector() {
     return el(
       'span',
       { className: 'field' },
-      el('span', { className: 'label', textContent: edge === 'in' ? 'In' : 'Out' }),
+      el('span', { className: 'label', textContent: edge === 'in' ? 'In' : 'Out', title: edge === 'in' ? 'Press [ to move In to the preview playhead' : 'Press ] to move Out to the preview playhead' }),
       el('button', { className: 'small', textContent: '−1f', title: 'One frame earlier', onclick: () => setClipEdge(clip, edge, clip[edge] - fd) }),
       input,
       el('button', { className: 'small', textContent: '+1f', title: 'One frame later', onclick: () => setClipEdge(clip, edge, clip[edge] + fd) }),
@@ -1028,9 +1064,9 @@ function renderInspector() {
     el('span', { className: 'label', textContent: `Length ${formatClock(clip.out - clip.in)}` }),
     el('button', { className: 'small', textContent: '← Move', disabled: i === 0, onclick: () => moveClip(-1) }),
     el('button', { className: 'small', textContent: 'Move →', disabled: i === seq.length - 1, onclick: () => moveClip(1) }),
-    el('button', { className: 'small', textContent: 'Split at playhead', onclick: splitClip }),
+    el('button', { className: 'small', textContent: 'Split at playhead', title: 'Split the clip at the preview playhead (S)', onclick: splitClip }),
     el('button', { className: 'small', textContent: 'Open in source', onclick: () => openClipInSource(clip) }),
-    el('button', { className: 'small danger', textContent: 'Remove', onclick: removeClip }),
+    el('button', { className: 'small danger', textContent: 'Remove', title: 'Remove the clip (Delete)', onclick: removeClip }),
   );
 }
 
@@ -1348,11 +1384,51 @@ document.addEventListener('keydown', (e) => {
   }
   if (mod) return;
   const src = currentSource();
+  const inProgram = state.focus === 'program' || !src;
+  // Keys that edit the sequence also make the sequence preview the active view.
+  const sequenceKey = (fn) => {
+    e.preventDefault();
+    state.focus = 'program';
+    fn();
+  };
   switch (e.key) {
     case ' ':
       e.preventDefault();
       if (state.focus === 'program') program.playing ? program.pause() : program.play();
       else if (src) sv.paused ? sv.play() : sv.pause();
+      break;
+    case 'ArrowUp':
+    case 'ArrowDown':
+      sequenceKey(() => selectNearClip(e.key === 'ArrowUp' ? -1 : 1));
+      break;
+    case 'x':
+    case 'X':
+      sequenceKey(() => {
+        const clip = project().sequence[program.index];
+        if (clip) selectClip(clip.id);
+      });
+      break;
+    case '[':
+    case ']':
+      sequenceKey(() => trimToPlayhead(e.key === '[' ? 'in' : 'out'));
+      break;
+    case 's':
+    case 'S':
+      sequenceKey(splitClip);
+      break;
+    // J, K, L: back one second, pause, play. Browsers cannot play video in reverse.
+    case 'j':
+    case 'J':
+      if (inProgram) program.seek(program.t - 1, { keepPlaying: program.playing });
+      else sv.currentTime = Math.max(0, sv.currentTime - 1);
+      break;
+    case 'k':
+    case 'K':
+      inProgram ? program.pause() : sv.pause();
+      break;
+    case 'l':
+    case 'L':
+      inProgram ? program.play() : sv.play();
       break;
     case 'i':
     case 'I':
@@ -1372,6 +1448,10 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         const dir = e.key === 'ArrowLeft' ? -1 : 1;
         e.shiftKey ? (sv.currentTime = Math.max(0, sv.currentTime + dir)) : step(dir);
+      } else if (state.focus === 'program' && program.plan.length) {
+        e.preventDefault();
+        program.pause();
+        program.seek(program.t + (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 1 : 1 / output().fps));
       }
       break;
     case 'Delete':
