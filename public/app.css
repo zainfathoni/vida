@@ -91,7 +91,9 @@ h3 { margin: 0 0 12px; }
 .badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 8px; background: #333a48; color: #c8cede; margin-right: 4px; }
 .badge.ok { background: #1f4630; color: #a8e6bf; }
 .badge.warn { background: #4c3a17; color: #f5d08a; }
-.source-list .row-actions { display: none; gap: 4px; margin-top: 5px; }
+.source-list .row-actions { display: none; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.panel-head.sub { border-top: 1px solid var(--line); }
+.select-list { flex: 0 1 auto; max-height: 40%; }
 .source-list li.active .row-actions { display: flex; }
 
 .monitor .screen { position: relative; flex: 1; min-height: 120px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }

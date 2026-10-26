@@ -30,7 +30,7 @@ The commands do not need the Vida server. They need Node.js 20+ and FFmpeg with 
 
 1. **Get sources and transcripts.** The easiest start is a project that the person made in Vida: they add the videos, make or import transcripts, and save. The agent can also write a new file (see the format below). Do not invent transcript text. Use only text from whisper.cpp, the API provider, or an SRT/VTT file for that video.
 2. **Make a copy for the draft.** Do not edit a project that is open in Vida with unsaved changes. Write the draft to a new file, for example `Episode 12 (agent draft).vida.json`.
-3. **Choose the cuts.** Use `sources[].transcript.segments` (and `words`, when present) to find source times. Add clips to `sequence` in the order of the final video.
+3. **Choose the cuts.** Use `sources[].transcript.segments` (and `words`, when present) to find source times. Add clips to `sequence` in the order of the final video. To propose ranges and let the person choose, write them to `selects` instead.
 4. **Validate.** Run `node bin/vida.js validate "<draft>.vida.json"`. Fix every error that it prints, then run it again.
 5. **Render.** Run `node bin/vida.js captions ...` for a fast check of the caption text and times, then `node bin/vida.js export ...`.
 6. **Hand over for review.** Give the person the path. They open it with **Open…**, or with `http://localhost:5178/?project=<URL-encoded absolute path>` while the server runs (`npm run serve`).
@@ -76,6 +76,9 @@ Vida checks the project file on disk every 2 seconds and when the window gets fo
   ],
   "sequence": [
     { "id": "c1", "sourceId": "camera", "in": 1.11, "out": 3.91 }
+  ],
+  "selects": [
+    { "id": "k1", "name": "Camera intro", "sourceId": "camera", "in": 1.11, "out": 3.91 }
   ]
 }
 ```
@@ -90,6 +93,7 @@ Vida checks the project file on disk every 2 seconds and when the window gets fo
 | `output` | no | `width`, `height`, `fps`. `null` or a missing value means "same as the source of the first clip". Width and height are rounded to even numbers. |
 | `sources` | yes | List of source videos. |
 | `sequence` | yes | Ordered list of clips. The first clip plays first. |
+| `selects` | no | Named source ranges that are kept for later. They are not in the video. |
 | `savedAt`, `relativePath` | no | Vida writes these when it saves. |
 
 ### Sources
@@ -113,11 +117,16 @@ Transcript segments: `start` and `end` are seconds in the source video, `text` i
 | `in` | Start in source seconds. |
 | `out` | End in source seconds. The clip is the range `[in, out)`. |
 
+### Selects (`selects`)
+
+A select has the same fields as a clip, plus `name` (a non-empty string). The person sees selects in the **Selects** list in Vida and can add one to the sequence with one click. An agent can propose ranges as selects, so that the person decides which ranges go into the video. Selects have the same validation rules as clips.
+
 ### Validation rules
 
 Vida checks these rules before it opens, saves, or renders a project. The error names the clip, for example `sequence[2] (id "c3"): out 16.500 is past the end of "camera-B.mp4" (16.000 s)`.
 
-- `sources` and `sequence` are lists. Source ids and clip ids are unique non-empty strings.
+- `sources` and `sequence` (and `selects`, if present) are lists. Source ids, clip ids, and select ids are unique non-empty strings. Each select has a non-empty `name`.
+- The range rules below apply to clips and to selects.
 - Each source has a `path`. If the file exists, its duration must be a positive number.
 - Each `sourceId` is the id of a source in the same project.
 - `in` and `out` are finite numbers (not strings, not `null`).

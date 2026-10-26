@@ -42,6 +42,7 @@ function summary(project) {
     name: project.name,
     sources: project.sources.map((s) => ({ id: s.id, name: s.name, duration: s.duration, missing: s.missing, transcript: s.transcript ? s.transcript.segments.length : 0 })),
     clips: plan.length,
+    selects: (project.selects || []).length,
     duration: planDuration(plan),
     output: settings,
     captionCues: cues.length,
@@ -68,7 +69,7 @@ async function main() {
     if (opts.json) console.log(JSON.stringify({ ok: true, ...info }, null, 2));
     else {
       console.log(`Valid: ${info.name}`);
-      console.log(`${info.clips} clips, ${info.duration.toFixed(3)} s, ${info.output.width}x${info.output.height} at ${info.output.fps} fps, ${info.captionCues} caption cues`);
+      console.log(`${info.clips} clips, ${info.selects} select${info.selects === 1 ? '' : 's'}, ${info.duration.toFixed(3)} s, ${info.output.width}x${info.output.height} at ${info.output.fps} fps, ${info.captionCues} caption cues`);
       for (const s of info.sources) console.log(`  source ${s.id}: ${s.name}, ${s.duration.toFixed(3)} s, ${s.transcript} transcript lines`);
     }
     return 0;

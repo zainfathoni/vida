@@ -75,26 +75,33 @@ export function validateProject(project) {
     });
   });
 
-  const clipIds = new Set();
-  sequence.forEach((c, i) => {
-    const where = `sequence[${i}]`;
-    if (!c || typeof c !== 'object') return errors.push(`${where} is not an object.`);
-    const label = `${where} (id ${JSON.stringify(c.id)})`;
-    if (typeof c.id !== 'string' || !c.id) errors.push(`${where} needs a non-empty string "id".`);
-    else if (clipIds.has(c.id)) errors.push(`${label}: the id is used by more than one clip.`);
-    clipIds.add(c.id);
-    const src = byId.get(c.sourceId);
-    if (!src) {
-      errors.push(`${label}: sourceId ${JSON.stringify(c.sourceId)} is not in "sources". Known ids: ${[...byId.keys()].join(', ') || 'none'}.`);
-    }
-    if (!isNum(c.in) || !isNum(c.out)) return errors.push(`${label}: "in" and "out" must be finite numbers of seconds (got in ${t(c.in)}, out ${t(c.out)}).`);
-    if (c.in < 0) errors.push(`${label}: in ${t(c.in)} is before the start of the source (0).`);
-    if (c.out <= c.in) errors.push(`${label}: out ${t(c.out)} is not after in ${t(c.in)}. Swap them or fix the range.`);
-    else if (c.out - c.in < MIN_CLIP - 1e-9) errors.push(`${label}: the clip is ${t(c.out - c.in)} s long. The minimum is ${MIN_CLIP} s.`);
-    if (src && !src.missing && isNum(src.duration) && c.out > src.duration + END_TOLERANCE) {
-      errors.push(`${label}: out ${t(c.out)} is past the end of "${src.name || src.id}" (${t(src.duration)} s).`);
-    }
-  });
+  // Sequence clips and selects are both source ranges with the same rules.
+  const checkRanges = (list, name, kind) => {
+    const ids = new Set();
+    list.forEach((c, i) => {
+      const where = `${name}[${i}]`;
+      if (!c || typeof c !== 'object') return errors.push(`${where} is not an object.`);
+      const label = `${where} (id ${JSON.stringify(c.id)})`;
+      if (typeof c.id !== 'string' || !c.id) errors.push(`${where} needs a non-empty string "id".`);
+      else if (ids.has(c.id)) errors.push(`${label}: the id is used by more than one ${kind}.`);
+      ids.add(c.id);
+      if (kind === 'select' && (typeof c.name !== 'string' || !c.name.trim())) errors.push(`${label}: a select needs a non-empty string "name".`);
+      const src = byId.get(c.sourceId);
+      if (!src) {
+        errors.push(`${label}: sourceId ${JSON.stringify(c.sourceId)} is not in "sources". Known ids: ${[...byId.keys()].join(', ') || 'none'}.`);
+      }
+      if (!isNum(c.in) || !isNum(c.out)) return errors.push(`${label}: "in" and "out" must be finite numbers of seconds (got in ${t(c.in)}, out ${t(c.out)}).`);
+      if (c.in < 0) errors.push(`${label}: in ${t(c.in)} is before the start of the source (0).`);
+      if (c.out <= c.in) errors.push(`${label}: out ${t(c.out)} is not after in ${t(c.in)}. Swap them or fix the range.`);
+      else if (c.out - c.in < MIN_CLIP - 1e-9) errors.push(`${label}: the ${kind} is ${t(c.out - c.in)} s long. The minimum is ${MIN_CLIP} s.`);
+      if (src && !src.missing && isNum(src.duration) && c.out > src.duration + END_TOLERANCE) {
+        errors.push(`${label}: out ${t(c.out)} is past the end of "${src.name || src.id}" (${t(src.duration)} s).`);
+      }
+    });
+  };
+  checkRanges(sequence, 'sequence', 'clip');
+  if (project.selects != null && !Array.isArray(project.selects)) errors.push('"selects" must be a list.');
+  else checkRanges(project.selects || [], 'selects', 'select');
 
   const o = output || {};
   for (const key of ['width', 'height', 'fps']) {

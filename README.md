@@ -40,6 +40,7 @@ The server listens on `127.0.0.1` only. Stop it with Ctrl+C.
    - Play or scrub the source, then press **I** (In) and **O** (Out), or
    - click a transcript line, then Shift+click another line. The selection sets In and Out.
 4. Press **A** or click **Add to sequence**. The new clip goes after the selected clip.
+   To keep a range for later, press **N** or click **Save select**, and give it a name. The range shows in the **Selects** list. Click a select to open its range, or click **Add to sequence**.
 5. In the **Sequence** panel, drag clips to change the order. Select a clip to change In and Out (type a time, or use −1f and +1f), split it at the preview playhead, or remove it. Double-click a clip to open it in the source view.
 6. Play the **Sequence preview**. Captions show on the preview.
 7. Click **Save** (Ctrl+S). Project files end with `.vida.json`.
@@ -78,6 +79,7 @@ An agent can write a `.vida.json` file, validate it, render it, and give it to y
 | Space | Play or pause the last-used view |
 | I / O | Mark In / Out in the source view |
 | A | Add the marked range to the sequence |
+| N | Save the marked range as a named select |
 | J / K / L | Back one second / pause / play (the last-used view). Browsers cannot play video in reverse |
 | ← / → | One frame back / forward in the last-used view. Shift: one second |
 | ↑ / ↓ | Select the previous / next clip and move the sequence preview to its start |

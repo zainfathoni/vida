@@ -230,3 +230,15 @@ test('validation checks transcript words', () => {
   assert.match(validateProject(project([{ start: 1, end: 0, text: 'hi' }]))[0], /words must be a list/);
   assert.match(validateProject(project([{ start: 0, end: 1, text: 'hi', off: 'yes' }]))[0], /words must be a list/);
 });
+
+test('validation checks selects like clips, and they need a name', () => {
+  const sources = [{ id: 'A', path: '/v/a.mp4', name: 'a.mp4', duration: 24 }];
+  const check = (sel) => validateProject({ sources, sequence: [], selects: [{ id: 'k', name: 'Intro', sourceId: 'A', in: 1, out: 2, ...sel }] });
+  assert.deepEqual(check({ in: 0, out: 24 }), []);
+  assert.deepEqual(validateProject({ sources, sequence: [] }), []); // older files have no selects
+  assert.match(check({ out: 30 })[0], /selects\[0\] \(id "k"\): out 30\.000 is past the end/);
+  assert.match(check({ sourceId: 'Z' })[0], /sourceId "Z" is not in "sources"/);
+  assert.match(check({ name: ' ' })[0], /needs a non-empty string "name"/);
+  assert.match(check({ in: 3, out: 2 })[0], /not after in/);
+  assert.match(validateProject({ sources, sequence: [], selects: {} })[0], /"selects" must be a list/);
+});

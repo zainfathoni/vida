@@ -38,6 +38,9 @@
       </div>
       <ul id="sourceList" class="source-list"></ul>
       <p id="sourcesEmpty" class="empty">Add Screen Studio exports or camera recordings. The original files are not changed.</p>
+      <div class="panel-head sub"><h2>Selects <span id="selectsInfo" class="muted"></span></h2></div>
+      <ul id="selectList" class="source-list select-list"></ul>
+      <p id="selectsEmpty" class="empty">Mark In and Out in the source view, then click Save select to keep a range with a name.</p>
     </section>
 
     <section class="panel monitor" id="sourceMonitor">
@@ -60,6 +63,7 @@
         <span class="spacer"></span>
         <button id="srcIn" title="Mark in (I)">In</button>
         <button id="srcOut" title="Mark out (O)">Out</button>
+        <button id="srcSave" title="Save the marked range as a named select (N)">Save select</button>
         <button id="srcAdd" class="primary" title="Add range to sequence (A)">Add to sequence</button>
       </div>
       <div class="marks" id="srcMarks">In – · Out – </div>

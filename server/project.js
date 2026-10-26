@@ -99,6 +99,7 @@ export async function saveProject(file, project, { baseRevision, overwrite = fal
       relativePath: path.relative(dir, path.resolve(s.path)),
     })),
     sequence: project.sequence.map(({ id, sourceId, in: i, out }) => ({ id, sourceId, in: i, out })),
+    selects: (project.selects || []).map(({ id, name, sourceId, in: i, out }) => ({ id, name, sourceId, in: i, out })),
   };
   fs.mkdirSync(dir, { recursive: true });
   const text = JSON.stringify(data, null, 2);
@@ -119,6 +120,7 @@ export function openProject(file) {
   if (data.app !== 'vida') throw new Error('This is not a Vida project file ("app" must be "vida").');
   if (data.version > PROJECT_VERSION) throw new Error('This project was made by a newer version of Vida.');
   if (!Array.isArray(data.sources) || !Array.isArray(data.sequence)) throw new Error('A Vida project needs "sources" and "sequence" lists.');
+  if (data.selects == null) data.selects = [];
   const dir = path.dirname(path.resolve(file));
   for (const s of data.sources) {
     if (typeof s.path === 'string') {

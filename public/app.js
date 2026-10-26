@@ -51,7 +51,7 @@ const state = {
 };
 
 function newProject() {
-  return { name: 'Untitled', output: {}, sources: [], sequence: [] };
+  return { name: 'Untitled', output: {}, sources: [], sequence: [], selects: [] };
 }
 
 const project = () => state.project;
@@ -314,10 +314,12 @@ async function relinkSource(src) {
 
 function removeSource(src) {
   const used = project().sequence.filter((c) => c.sourceId === src.id).length;
-  if (!confirm(`Remove "${src.name}" from the project?${used ? ` ${used} sequence clip(s) use it and will also be removed.` : ''} The file on disk is not deleted.`)) return;
+  const selects = project().selects.filter((c) => c.sourceId === src.id).length;
+  if (!confirm(`Remove "${src.name}" from the project?${used ? ` ${used} sequence clip(s) use it and will also be removed.` : ''}${selects ? ` ${selects} select(s) will also be removed.` : ''} The file on disk is not deleted.`)) return;
   checkpoint();
   project().sources = project().sources.filter((s) => s !== src);
   project().sequence = project().sequence.filter((c) => c.sourceId !== src.id);
+  project().selects = project().selects.filter((c) => c.sourceId !== src.id);
   if (state.selectedSourceId === src.id) {
     state.selectedSourceId = null;
     loadSource(null);
@@ -352,6 +354,84 @@ function renderSources() {
     li.append(actions);
     list.append(li);
   }
+  renderSelects();
+}
+
+// ------------------------------------------------------------------ selects
+// A select is a named source range that the person (or an agent) keeps for
+// later. It is not in the video until it is added to the sequence.
+
+function renderSelects() {
+  const list = $('selectList');
+  list.replaceChildren();
+  const selects = project().selects;
+  $('selectsEmpty').hidden = selects.length > 0 || !project().sources.length;
+  $('selectsInfo').textContent = selects.length ? String(selects.length) : '';
+  for (const c of selects) {
+    const src = sourceById(c.sourceId);
+    const li = el(
+      'li',
+      { className: c.id === state.selectedSelectId ? 'active' : '', style: `--c:${sourceColor(c.sourceId)}`, title: 'Click to open the range in the source view', onclick: () => openSelect(c) },
+      el('div', { className: 'name', textContent: c.name }),
+      el('div', { className: 'meta', textContent: `${src ? src.name : '?'} · ${formatClock(c.in, 1)}–${formatClock(c.out, 1)} · ${formatClock(c.out - c.in, 1)}` }),
+    );
+    const act = (text, fn, cls = 'small') => el('button', { className: cls, textContent: text, onclick: (e) => (e.stopPropagation(), fn()) });
+    li.append(el('div', { className: 'row-actions' },
+      act('Add to sequence', () => { openSelect(c); addRangeToSequence({ in: c.in, out: c.out }); }, 'small primary'),
+      act('Rename', () => renameSelect(c)),
+      act('Remove', () => removeSelect(c), 'small danger'),
+    ));
+    list.append(li);
+  }
+}
+
+function openSelect(c) {
+  state.selectedSelectId = c.id;
+  state.marks[c.sourceId] = { in: c.in, out: c.out };
+  loadSource(c.sourceId, c.in);
+}
+
+/** Default name: the transcript words in the range, or the source name and times. */
+function selectName(src, inT, outT) {
+  const words = (src.transcript ? src.transcript.segments : [])
+    .filter((g) => g.end > inT && g.start < outT)
+    .map((g) => g.text)
+    .join(' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length) return words.slice(0, 8).join(' ') + (words.length > 8 ? '…' : '');
+  return `${src.name} ${formatClock(inT, 1)}–${formatClock(outT, 1)}`;
+}
+
+function saveSelect() {
+  const src = currentSource();
+  if (!src) return;
+  const m = marks();
+  const inT = m.in ?? 0;
+  const outT = Math.min(m.out ?? src.duration, src.duration);
+  if (outT - inT < MIN_CLIP) return toast('The range is too short. Mark In and Out first.', true);
+  const name = prompt('Name of the select:', selectName(src, inT, outT));
+  if (name == null || !name.trim()) return;
+  checkpoint();
+  const c = { id: uid('k'), name: name.trim(), sourceId: src.id, in: round3(inT), out: round3(outT) };
+  project().selects.push(c);
+  state.selectedSelectId = c.id;
+  changed({ timeline: false });
+  toast(`Saved select "${c.name}"`);
+}
+
+function renameSelect(c) {
+  const name = prompt('New name of the select:', c.name);
+  if (name == null || !name.trim() || name.trim() === c.name) return;
+  checkpoint();
+  c.name = name.trim();
+  changed({ timeline: false });
+}
+
+function removeSelect(c) {
+  checkpoint();
+  project().selects = project().selects.filter((x) => x !== c);
+  changed({ timeline: false });
 }
 
 // ---------------------------------------------------------- source monitor
@@ -438,7 +518,7 @@ function renderSourceUi() {
   $('srcMarks').textContent = src
     ? `In ${m.in == null ? '–' : formatClock(m.in)} · Out ${m.out == null ? '–' : formatClock(m.out)} · Length ${formatClock(Math.max(0, outT - inT))}`
     : 'In – · Out –';
-  for (const id of ['srcBack', 'srcPlay', 'srcFwd', 'srcIn', 'srcOut', 'srcAdd']) $(id).disabled = !src || src.missing;
+  for (const id of ['srcBack', 'srcPlay', 'srcFwd', 'srcIn', 'srcOut', 'srcAdd', 'srcSave']) $(id).disabled = !src || src.missing;
   highlightTranscript();
 }
 
@@ -467,6 +547,7 @@ function markOut() {
 $('srcIn').onclick = markIn;
 $('srcOut').onclick = markOut;
 $('srcAdd').onclick = () => addRangeToSequence();
+$('srcSave').onclick = saveSelect;
 
 function addRangeToSequence(range) {
   const src = currentSource();
@@ -1177,7 +1258,7 @@ async function openProjectFile(file) {
   try {
     const { project: p, file: resolved, revision } = await api('/api/project/open', { file });
     program.pause();
-    state.project = { name: p.name, output: p.output || {}, sources: p.sources, sequence: p.sequence };
+    state.project = { name: p.name, output: p.output || {}, sources: p.sources, sequence: p.sequence, selects: p.selects || [] };
     state.doc++;
     Object.assign(state, { file: resolved, revision, dirty: false, selectedClipId: null, marks: {} });
     state.history.clear();
@@ -1497,6 +1578,10 @@ document.addEventListener('keydown', (e) => {
     case 'a':
     case 'A':
       if (src) addRangeToSequence();
+      break;
+    case 'n':
+    case 'N':
+      if (src) saveSelect();
       break;
     case 'ArrowLeft':
     case 'ArrowRight':

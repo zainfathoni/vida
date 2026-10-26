@@ -157,12 +157,16 @@ test('export, captions, and persistence with generated fixtures', { timeout: 600
     const moved = path.join(WORK, 'moved');
     fs.mkdirSync(path.join(moved, 'media'), { recursive: true });
     const projFile = path.join(WORK, 'orig', 'ep.vida.json');
-    const copy = { ...project, sources: project.sources.map((s) => ({ ...s, path: path.join(WORK, 'orig', 'media', path.basename(s.path)) })) };
+    const selects = [{ id: 'k1', name: 'Thanks', sourceId: 'B', in: 10.2, out: 12.8 }];
+    const copy = { ...project, selects, sources: project.sources.map((s) => ({ ...s, path: path.join(WORK, 'orig', 'media', path.basename(s.path)) })) };
     fs.mkdirSync(path.join(WORK, 'orig', 'media'), { recursive: true });
     for (const s of project.sources) fs.copyFileSync(s.path, path.join(WORK, 'orig', 'media', path.basename(s.path)));
     await saveProject(projFile, copy);
     const reopened = openProject(projFile);
     assert.deepEqual(reopened.sequence, project.sequence);
+    assert.deepEqual(reopened.selects, selects);
+    // A select past the real end of camera-B (16 s) is not saved.
+    await assert.rejects(saveProject(projFile, { ...copy, selects: [{ ...selects[0], out: 17 }] }, { overwrite: true }), /selects\[0\] \(id "k1"\): out 17\.000 is past the end of "camera-B\.mp4"/);
     assert.deepEqual(reopened.sources.map((s) => s.transcript), project.sources.map((s) => s.transcript));
     assert.ok(reopened.sources.every((s) => !s.missing));
     // Move the whole folder: absolute paths break, relative paths still work.
