@@ -187,6 +187,12 @@ The end-to-end test makes three videos with different sizes, frame rates, codecs
 
 - The preview switches between two video elements at each cut. A cut in the preview can show a short delay. The export has no delay.
 - Variable frame rate sources are converted to a constant frame rate at export.
-- No waveform display, no audio level controls, no transitions, no AI suggestions.
+- No audio level controls, no transitions, no AI suggestions.
 - Undo history is not saved with the project.
 - Tests used generated videos only. Tests with real Screen Studio and DJI Pocket recordings are still necessary.
+
+## Licence
+
+Vida is available under the [MIT License](LICENSE).
+
+Vida does not include FFmpeg, whisper.cpp, or whisper models. You install them yourself, and their own licences apply to them. FFmpeg is LGPL or GPL, depending on how it was built. whisper.cpp and the models in the links above are MIT.

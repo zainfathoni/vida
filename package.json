@@ -4,6 +4,7 @@
   "description": "Small local-first video editor: import takes, cut by transcript, reorder, preview, and export one video with SRT/VTT captions.",
   "type": "module",
   "private": true,
+  "license": "MIT",
   "engines": { "node": ">=20" },
   "bin": { "vida": "bin/vida.js" },
   "scripts": {
