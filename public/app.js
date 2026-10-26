@@ -434,6 +434,62 @@ function removeSelect(c) {
   changed({ timeline: false });
 }
 
+// ---------------------------------------------------------------- waveforms
+// Audio peaks come from the server (one value per 10 ms, cached on disk).
+// They show where there is speech and where there is silence.
+
+const waves = new Map(); // source path -> { rate, peaks: Uint8Array } | null (no audio) | 'loading'
+
+function waveFor(src) {
+  if (!src || src.missing || !src.hasAudio) return null;
+  const w = waves.get(src.path);
+  if (w !== undefined) return w === 'loading' ? null : w;
+  waves.set(src.path, 'loading');
+  api(`/api/waveform?path=${encodeURIComponent(src.path)}`)
+    .then((r) => waves.set(src.path, r.peaks ? { rate: r.rate, peaks: Uint8Array.from(atob(r.peaks), (c) => c.charCodeAt(0)) } : null))
+    .catch(() => waves.set(src.path, null))
+    .finally(() => {
+      renderTimeline();
+      drawSourceWave(true);
+    });
+  return null;
+}
+
+/** Draws the peaks of source time [from, to) into the canvas. Times in [hiFrom, hiTo) are brighter. */
+function drawWave(canvas, wave, from, to, { color = '#9aa3b5', hi = null } = {}) {
+  const dpr = devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
+  const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
+  const g = canvas.getContext('2d');
+  g.clearRect(0, 0, w, h);
+  if (!wave || !(to > from)) return;
+  const { rate, peaks } = wave;
+  for (let x = 0; x < w; x++) {
+    const t0 = from + ((to - from) * x) / w;
+    const t1 = from + ((to - from) * (x + 1)) / w;
+    let p = 0;
+    for (let i = Math.floor(t0 * rate), end = Math.max(i + 1, Math.ceil(t1 * rate)); i < end && i < peaks.length; i++) if (peaks[i] > p) p = peaks[i];
+    const bar = Math.max(1, (p / 255) * h);
+    g.fillStyle = hi && t0 >= hi[0] && t0 < hi[1] ? '#8fb6ff' : color;
+    g.fillRect(x, (h - bar) / 2, 1, bar);
+  }
+}
+
+let sourceWaveKey = '';
+function drawSourceWave(force = false) {
+  const src = currentSource();
+  const canvas = $('sourceWave');
+  const wave = waveFor(src);
+  const m = src ? marks() : {};
+  const hi = src && (m.in != null || m.out != null) ? [m.in ?? 0, m.out ?? src.duration] : null;
+  const key = `${src ? src.path : ''}|${canvas.clientWidth}|${hi}|${Boolean(wave)}`;
+  if (!force && key === sourceWaveKey) return;
+  sourceWaveKey = key;
+  drawWave(canvas, wave, 0, src ? src.duration : 0, { hi });
+}
+
 // ---------------------------------------------------------- source monitor
 
 const sv = $('sourceVideo');
@@ -515,6 +571,7 @@ function renderSourceUi() {
     range.style.left = `${12 + (inT / dur) * w}px`;
     range.style.width = `${Math.max(2, ((outT - inT) / dur) * w)}px`;
   } else range.style.display = 'none';
+  drawSourceWave();
   $('srcMarks').textContent = src
     ? `In ${m.in == null ? '–' : formatClock(m.in)} · Out ${m.out == null ? '–' : formatClock(m.out)} · Length ${formatClock(Math.max(0, outT - inT))}`
     : 'In – · Out –';
@@ -1020,6 +1077,12 @@ function renderTimeline() {
       el('div', { className: 'cl-num', textContent: `#${i + 1} · ${formatClock(entry.duration, 1)}` }),
     );
     node.dataset.id = clip.id;
+    const wave = waveFor(src);
+    if (wave) {
+      const canvas = el('canvas', { className: 'wave' });
+      node.append(canvas);
+      requestAnimationFrame(() => drawWave(canvas, wave, entry.in, entry.out, { color: 'rgba(230, 233, 240, 0.55)' }));
+    }
     node.onclick = (e) => {
       selectClip(clip.id);
       const rect = node.getBoundingClientRect();

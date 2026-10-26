@@ -150,6 +150,10 @@ Vida sends 20-minute parts, so each upload stays below the 25 MB limit.
 - Output: H.264 (CRF 18) and AAC 192 kbit/s MP4, plus `.srt` and `.vtt` files with the same name.
 - Vida refuses to write an output file to the path of a source file.
 
+### Waveforms
+
+The source view and each clip in the sequence show the audio waveform, so you can see speech and silence before you cut. The marked In/Out range is brighter in the source waveform. Vida reads the audio once with FFmpeg and keeps the peaks (one value for each 10 ms) in `~/.vida/waveforms/`. The source file is only read. A video without audio has no waveform.
+
 ### Preview copies
 
 Browsers cannot play some camera files, for example HEVC (H.265) or 10-bit video. For these files, Vida makes a 720p H.264 preview copy in `~/.vida/proxies/`. The preview copy is only for the preview. Export always reads the original file. If a video does not play, click **Make preview copy** in the source list.

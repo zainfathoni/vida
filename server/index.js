@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { APP_DIR, config, providerStatus } from './config.js';
 import { startJob, getJob, cancelJob } from './jobs.js';
-import { probe, makeProxy, proxyPathFor, VIDEO_EXTENSIONS } from './media.js';
+import { probe, makeProxy, proxyPathFor, waveform, VIDEO_EXTENSIONS } from './media.js';
 import { transcribe } from './transcribe.js';
 import { exportProject, writeCaptions } from './export.js';
 import { saveProject, loadProject, projectRevision, PROJECT_EXT } from './project.js';
@@ -139,6 +139,11 @@ const routes = {
       }
     }
     return { sources, errors };
+  },
+  'GET /api/waveform': async (req, url) => {
+    const file = path.resolve(url.searchParams.get('path') || '');
+    if (!mediaAllowlist.has(file)) throw Object.assign(new Error('This file is not a project source.'), { status: 403 });
+    return waveform(file);
   },
   'POST /api/proxy': async (req) => {
     const { path: file, duration } = await readJson(req);

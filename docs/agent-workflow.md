@@ -152,5 +152,6 @@ The browser uses these routes. A script can use them too. The server accepts req
 | `GET /api/project/revision?file=` | — | `{ revision }`. `null` if the file does not exist. |
 | `POST /api/export` | `{ project, file }` | A job. Poll `GET /api/jobs/<id>` until `status` is `done` or `error`. A project that is not valid for the media on disk ends with `status: "error"` and writes nothing. |
 | `POST /api/captions` | `{ project, file }` | `{ srt, vtt, cues }`. HTTP 422 if the project is not valid for the media on disk. |
+| `GET /api/waveform?path=` | — | `{ rate: 100, peaks }`. `peaks` is base64, one byte (0–255) for each 10 ms, or `null` if the file has no audio. Only for sources of a project that the server opened (HTTP 403 for other files). |
 
 `revision` is the SHA-256 of the bytes of the project file.

@@ -359,6 +359,35 @@ test('HTTP save, captions, and export check the real media, not the submitted fa
   assert.equal((await exportJob({ file: path.join(dir, 'gone-out.mp4'), project: gone })).status, 'error');
   assert.ok(!fs.readdirSync(dir).some((f) => f.startsWith('gone-out')));
 
+  // Waveform: only project sources; louder where the truth has speech; null without audio.
+  const get = async (route) => {
+    const r = await fetch(`http://127.0.0.1:${port}${route}`);
+    return { status: r.status, body: await r.json() };
+  };
+  assert.equal((await get(`/api/waveform?path=${encodeURIComponent(base.sources[1].path)}`)).status, 403);
+  const waveFile = path.join(dir, 'wave.vida.json');
+  assert.equal((await post('/api/project/save', { file: waveFile, project: base })).status, 200);
+  await post('/api/project/open', { file: waveFile });
+  for (const s of base.sources) {
+    const { status, body } = await get(`/api/waveform?path=${encodeURIComponent(s.path)}`);
+    assert.equal(status, 200);
+    const t = truth.sources[s.id];
+    if (!t.hasAudio) {
+      assert.equal(body.peaks, null);
+      continue;
+    }
+    const peaks = Buffer.from(body.peaks, 'base64');
+    assert.equal(body.rate, 100);
+    assert.ok(Math.abs(peaks.length - s.duration * 100) <= 1, `${s.id}: ${peaks.length} peaks`);
+    const level = (a, b) => peaks.subarray(Math.round(a * 100), Math.round(b * 100)).reduce((x, y) => x + y, 0) / ((b - a) * 100);
+    // Quiet: not in a phrase and not near a flash beep.
+    const busy = (x) => t.phrases.some((p) => x > p.start - 0.2 && x < p.end + 0.2) || t.flashes.some((f) => x > f - 0.2 && x < f + truth.flash + 0.2);
+    const quiet = [];
+    for (let x = 0; x < s.duration; x += 0.01) if (!busy(x)) quiet.push(peaks[Math.round(x * 100)] || 0);
+    const quietLevel = quiet.reduce((x, y) => x + y, 0) / quiet.length;
+    for (const p of t.phrases) assert.ok(level(p.start, p.end) > 5 * quietLevel + 5, `${s.id} "${p.text}": ${level(p.start, p.end)} vs quiet ${quietLevel}`);
+  }
+
   // A stale save over HTTP is rejected and the disk bytes stay the same.
   const { body: opened } = await post('/api/project/open', { file: goneFile });
   fs.writeFileSync(goneFile, fs.readFileSync(goneFile, 'utf8').replace('"name": "e2e"', '"name": "agent edit"'));

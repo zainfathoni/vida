@@ -108,6 +108,9 @@ h3 { margin: 0 0 12px; }
 .caption span { background: rgba(0, 0, 0, 0.75); padding: 2px 8px; border-radius: 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .scrub { position: relative; padding: 6px 12px 0; }
 .scrub input[type=range] { width: 100%; margin: 0; position: relative; z-index: 1; background: transparent; }
+.scrub canvas.wave { display: block; width: 100%; height: 26px; margin-top: 2px; }
+.clip canvas.wave { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 24px; pointer-events: none; opacity: 0.85; }
+.clip .cl-name, .clip .cl-meta, .clip .cl-num { position: relative; z-index: 1; }
 .range-mark { position: absolute; top: 12px; height: 6px; background: rgba(79, 140, 255, 0.45); border-radius: 2px; display: none; }
 .ticks { position: absolute; left: 12px; right: 12px; top: 6px; height: 16px; pointer-events: none; }
 .ticks i { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--warn); opacity: 0.7; }
@@ -146,7 +149,7 @@ h3 { margin: 0 0 12px; }
 .clip.drop-after { box-shadow: 4px 0 0 var(--warn); }
 .clip .cl-name { font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .clip .cl-meta { font-size: 11px; color: #c5cad6; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.clip .cl-num { position: absolute; right: 6px; bottom: 4px; font-size: 10px; color: #aab; }
+.clip .cl-num { position: absolute !important; right: 6px; bottom: 4px; font-size: 10px; color: #aab; }
 .playhead { position: absolute; top: 6px; bottom: 6px; width: 2px; background: #ff4f6a; pointer-events: none; left: 12px; }
 .inspector { border-top: 1px solid var(--line); padding: 8px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-height: 52px; overflow: auto; }
 .inspector .field { display: flex; align-items: center; gap: 4px; }

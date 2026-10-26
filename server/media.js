@@ -117,6 +117,59 @@ export async function makeProxy(file, duration, job) {
   return out;
 }
 
+export const WAVE_RATE = 100; // peaks per second
+const WAVE_SAMPLE_RATE = 8000;
+const waveJobs = new Map();
+
+/**
+ * Audio peaks for the waveform display: one value (0–255) for each 10 ms.
+ * Returns { rate, peaks } with peaks as base64, or { peaks: null } if the
+ * file has no audio. The result is cached in DATA_DIR/waveforms, so a file
+ * is decoded only once. The source file is only read.
+ */
+export function waveform(file) {
+  const out = path.join(DATA_DIR, 'waveforms', `${sourceKey(file)}.json`);
+  if (fs.existsSync(out)) return Promise.resolve(JSON.parse(fs.readFileSync(out, 'utf8')));
+  if (waveJobs.has(out)) return waveJobs.get(out);
+  const run = new Promise((resolve, reject) => {
+    const proc = spawn(config.ffmpeg, ['-hide_banner', '-nostdin', '-v', 'error', '-i', file, '-map', '0:a:0', '-ac', '1', '-ar', String(WAVE_SAMPLE_RATE), '-f', 's16le', '-']);
+    const per = WAVE_SAMPLE_RATE / WAVE_RATE;
+    const peaks = [];
+    let peak = 0;
+    let n = 0;
+    let rest = Buffer.alloc(0);
+    let stderr = '';
+    proc.stdout.on('data', (chunk) => {
+      const buf = rest.length ? Buffer.concat([rest, chunk]) : chunk;
+      const end = buf.length - (buf.length % 2);
+      for (let i = 0; i < end; i += 2) {
+        const v = Math.abs(buf.readInt16LE(i));
+        if (v > peak) peak = v;
+        if (++n === per) {
+          peaks.push(Math.min(255, Math.round((peak / 32768) * 255)));
+          peak = 0;
+          n = 0;
+        }
+      }
+      rest = buf.subarray(end);
+    });
+    proc.stderr.on('data', (d) => (stderr = (stderr + d).slice(-2000)));
+    proc.on('error', (err) => reject(new Error(`Cannot start ffmpeg (${config.ffmpeg}): ${err.message}`)));
+    proc.on('close', (code) => {
+      // ffmpeg fails to map 0:a:0 when the file has no audio stream.
+      if (code !== 0 && /matches no streams|does not contain any stream/i.test(stderr)) return resolve({ rate: WAVE_RATE, peaks: null });
+      if (code !== 0) return reject(new Error(`ffmpeg could not read the audio: ${stderr.trim().split('\n').pop()}`));
+      if (n) peaks.push(Math.min(255, Math.round((peak / 32768) * 255)));
+      const result = { rate: WAVE_RATE, peaks: Buffer.from(peaks).toString('base64') };
+      fs.mkdirSync(path.dirname(out), { recursive: true });
+      fs.writeFileSync(out, JSON.stringify(result));
+      resolve(result);
+    });
+  }).finally(() => waveJobs.delete(out));
+  waveJobs.set(out, run);
+  return run;
+}
+
 /** Extracts mono 16 kHz audio for transcription. */
 export async function extractAudio(file, out, { format = 'wav', start, duration } = {}) {
   const args = [];
