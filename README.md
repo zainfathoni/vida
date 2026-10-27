@@ -2,6 +2,8 @@
 
 Vida is a small local video editor for episodes made from several recordings, for example Screen Studio exports and DJI Pocket camera files.
 
+Homepage: [vida.zainf.dev](https://vida.zainf.dev/)
+
 With Vida, you can:
 
 - Import several videos. Vida reads the files in place. It does not copy or change them.
@@ -145,6 +147,7 @@ Vida sends 20-minute parts, so each upload stays below the 25 MB limit.
 - `public/` is the browser app (plain JavaScript, no build step).
 - `public/lib/timeline.js` has the timeline rules and the project validation. The preview, the export, and `bin/vida.js` all use it, so they agree.
 - `bin/vida.js` is the command line tool (`validate`, `captions`, `export`).
+- `site/` is the static homepage. `.github/workflows/pages.yml` publishes it to GitHub Pages. The Vida server does not serve it, and the homepage does not contain the editor.
 
 ### Timing rules
 

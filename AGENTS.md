@@ -21,3 +21,4 @@ Read [docs/agent-workflow.md](docs/agent-workflow.md) first. It has the project 
 - `server/export.js` renders. It validates before it writes anything.
 - Tests: `npm test` (unit, fast) and `npm run test:e2e` (generates fixtures with FFmpeg, about 30 s). `node --test test/whisper.test.js` needs whisper.cpp settings.
 - Write user-facing text and docs in ASD-STE100 Simplified Technical English.
+- `site/` is the public homepage (static HTML and CSS, published by `.github/workflows/pages.yml`). It is not the editor. Do not put editor code or API calls in it, and do not serve it from `server/`. Its styles copy the editor tokens from `public/app.css`. Use only real screenshots made with generated or public-safe footage. Keep its claims the same as the README, including the experimental status.

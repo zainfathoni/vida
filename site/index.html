@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vida: a local video editor that agents and people share</title>
+  <meta name="description" content="Vida is a free, MIT-licensed local video editor. An agent prepares an editable draft. You review and change it in the same visual editor. Your media stays on your computer." />
+  <link rel="canonical" href="https://vida.zainf.dev/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://vida.zainf.dev/" />
+  <meta property="og:title" content="Vida: the agent makes the draft, you make the decisions" />
+  <meta property="og:description" content="A local video editor. An agent writes an editable project. You review it in the same editor. MIT, experimental." />
+  <meta property="og:image" content="https://vida.zainf.dev/images/og.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#101216" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="site.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="Vida home">
+      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="7" height="12" rx="2" fill="#4f8cff"/><rect x="10" y="6" width="5" height="12" rx="2" fill="#f0814c"/><rect x="16" y="6" width="6" height="12" rx="2" fill="#3cc68a"/><rect x="12.2" y="3" width="1.6" height="18" rx=".8" fill="#ff4f6a"/></svg>
+      Vida
+    </a>
+    <nav class="actions" aria-label="Main">
+      <a class="button ghost hide-sm" href="#how">How it works</a>
+      <a class="button ghost hide-sm" href="#features">Features</a>
+      <a class="button ghost hide-sm" href="#local">Privacy</a>
+      <a class="button" href="#install">Install</a>
+      <a class="button primary" href="https://github.com/zainfathoni/vida">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-text">
+        <p class="badges">
+          <a class="badge warn" href="#status">Experimental: read the status</a>
+          <span class="badge">MIT License</span>
+          <span class="badge ok">Runs on your computer</span>
+        </p>
+        <h1>The agent makes the draft. <span class="accent">You make the decisions.</span></h1>
+        <p class="lead">Vida is a small local video editor for episodes made from several recordings. An agent writes an editable project file. You open the same file in the Vida editor, look at each cut, and change what you do not like.</p>
+        <div class="cta">
+          <a class="button primary large" href="#install">Install Vida</a>
+          <a class="button large" href="https://github.com/zainfathoni/vida">View the code on GitHub</a>
+        </div>
+      </div>
+
+      <aside class="hero-install" aria-label="Quick start">
+        <div class="code-block" data-copy-block>
+          <div class="code-head"><span>Terminal</span><button type="button" class="small" data-copy aria-live="polite">Copy</button></div>
+<pre tabindex="0"><code>git clone https://github.com/zainfathoni/vida.git
+cd vida
+npm start</code></pre>
+        </div>
+        <p class="hint">Needs Node.js 20+ and FFmpeg. No npm dependencies, no account.</p>
+      </aside>
+
+      <figure class="monitor hero-shot">
+        <img src="images/editor-agent-draft.webp" width="2400" height="1500"
+          alt="The Vida editor with a project named Demo episode. Left: four sources and three named selects. Center: the source view of intro take 2 with an audio waveform, and the sequence preview with the caption 'then it runs validate and fixes every error.' Right: the whisper.cpp transcript. Bottom: a sequence of four colored clips with waveforms, and the clip inspector with In and Out times." />
+        <figcaption>Real screenshot of Vida. The agent wrote the sequence and the selects. The footage is generated demo footage with a synthetic voice. The transcript is from whisper.cpp.</figcaption>
+      </figure>
+    </section>
+
+    <section class="section" id="how" aria-labelledby="how-title">
+      <div class="section-head">
+        <h2 id="how-title">How it works</h2>
+        <p class="muted">One project file goes from the agent to you, in order.</p>
+      </div>
+      <ol class="track" aria-label="Workflow steps">
+        <li class="clip" style="--c: #4f8cff">
+          <span class="cl-num">1 · Agent</span>
+          <strong>Writes a draft</strong>
+          <span>It reads the transcripts and writes clips and named selects to <code>Episode (agent draft).vida.json</code>.</span>
+        </li>
+        <li class="clip" style="--c: #f0814c">
+          <span class="cl-num">2 · Agent</span>
+          <strong>Validates it</strong>
+          <span><code>vida validate</code> reads each source with ffprobe and names each bad clip. The agent fixes every error.</span>
+        </li>
+        <li class="clip" style="--c: #3cc68a">
+          <span class="cl-num">3 · You</span>
+          <strong>Review in the editor</strong>
+          <span>Open the draft in Vida. Change takes, trim, split, reorder, and correct caption words.</span>
+        </li>
+        <li class="clip" style="--c: #c86bff">
+          <span class="cl-num">4 · You or the agent</span>
+          <strong>Export</strong>
+          <span>One MP4 with SRT and VTT captions. Caption times move with each cut.</span>
+        </li>
+      </ol>
+      <p class="note"><strong>Vida does not choose the edits.</strong> The agent proposes the cuts, and it does not always choose the best take. Vida checks that each cut is possible and renders it exactly. You decide what is final.</p>
+    </section>
+
+    <section class="section split" aria-labelledby="review-title">
+      <div>
+        <div class="section-head">
+          <h2 id="review-title">Review and adjust</h2>
+          <p class="muted">The draft is not a finished video. It is a project that you can edit.</p>
+        </div>
+        <ul class="checks">
+          <li>Each source keeps its transcript. Click a line or a word to go to that time.</li>
+          <li>Double-click a word to correct it. The word keeps its time, so the captions stay in sync.</li>
+          <li>Alt+click a filler word to remove it from the captions. It stays in the transcript.</li>
+          <li>The agent can propose ranges as named selects. You add the ones that you want with one click.</li>
+        </ul>
+      </div>
+      <figure class="monitor narrow">
+        <img src="images/transcript-review.webp" width="680" height="700" loading="lazy"
+          alt="The Vida transcript panel for intro take 1. The word 'Bye' is open for correction and now reads 'Hi'. The filler word 'um' is struck through because it is off in the captions. Below: 'Wait, let me start again.' and a 'No speech' row." />
+        <figcaption>whisper.cpp heard “Bye”. A person corrects it to “Hi” and turns off “um”.</figcaption>
+      </figure>
+    </section>
+
+    <section class="section" aria-labelledby="handoff-title">
+      <div class="split top">
+        <div class="section-head">
+          <h2 id="handoff-title">Safe hand-off</h2>
+          <p class="muted">The agent and you can work on the same project.</p>
+        </div>
+        <ul class="checks">
+          <li>Vida checks the project file every 2 seconds. When the file changes, a bar shows <b>Reload from disk</b>.</li>
+          <li>After a reload, Undo brings back your earlier version.</li>
+          <li>Save sends the revision of your version. If the file on disk is newer, the save fails and the file stays the same.</li>
+          <li>This check is not a file lock. Agents write to a new draft file, not to a file that you have open.</li>
+        </ul>
+      </div>
+      <figure class="monitor">
+        <img src="images/reload-from-disk.webp" width="2200" height="1000" loading="lazy"
+          alt="The Vida editor with a yellow bar below the top bar: 'The project file changed on disk. Reload it to see the new version.' Buttons: Reload from disk, Save as, Keep editing. The Selects list shows 4 selects, and the transcript shows 'um' struck through." />
+        <figcaption>An agent added a select while the project was open in Vida. The person decides when to reload.</figcaption>
+      </figure>
+    </section>
+
+    <section class="section" id="features" aria-labelledby="features-title">
+      <div class="section-head">
+        <h2 id="features-title">Features</h2>
+        <p class="muted">A small editor for one job: cut several recordings into one episode.</p>
+      </div>
+      <div class="grid">
+        <article class="panel"><div class="panel-head"><h3>Several takes</h3></div><p>Import screen recordings and camera files. Vida reads them in place. It does not copy, change, or delete them.</p></article>
+        <article class="panel"><div class="panel-head"><h3>Non-destructive cuts</h3></div><p>Trim to the frame, split at the playhead, drag to reorder, and remove clips. Undo and Redo.</p></article>
+        <article class="panel"><div class="panel-head"><h3>Transcripts and captions</h3></div><p>Cut by transcript lines. Correct each word. Silent parts show as “No speech” rows.</p></article>
+        <article class="panel"><div class="panel-head"><h3>Named selects</h3></div><p>Keep good ranges for later with a name. An agent can propose ranges this way.</p></article>
+        <article class="panel"><div class="panel-head"><h3>Audio waveforms</h3></div><p>See speech and silence in the source view and on each clip before you cut.</p></article>
+        <article class="panel"><div class="panel-head"><h3>Keyboard editing</h3></div><p><kbd>I</kbd> <kbd>O</kbd> mark, <kbd>A</kbd> add, <kbd>N</kbd> select, <kbd>S</kbd> split, <kbd>[</kbd> <kbd>]</kbd> trim, <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> play.</p></article>
+        <article class="panel"><div class="panel-head"><h3>Saved JSON projects</h3></div><p>A <code>.vida.json</code> file keeps your edit decisions and transcripts. People and agents can read and write it.</p></article>
+        <article class="panel"><div class="panel-head"><h3>Headless CLI</h3></div><p><code>validate</code>, <code>captions</code>, and <code>export</code> work without the browser and use the same timeline code.</p></article>
+        <article class="panel"><div class="panel-head"><h3>MP4, SRT, VTT</h3></div><p>H.264 and AAC video with captions. Audio stays in sync after many cuts.</p></article>
+      </div>
+    </section>
+
+    <section class="section split" aria-labelledby="cli-title">
+      <div>
+        <div class="section-head">
+          <h2 id="cli-title">For agents</h2>
+          <p class="muted">An agent uses the same project format and the same rules as the editor.</p>
+        </div>
+        <ul class="checks">
+          <li>Validation names each bad clip, for example a clip that ends after its video.</li>
+          <li><code>captions</code> and <code>export</code> validate first. If the project is not valid, they write nothing.</li>
+          <li>Export never writes to the path of a source file.</li>
+          <li>Agents must not invent transcript text. They use whisper.cpp, the API provider, or SRT/VTT files.</li>
+        </ul>
+        <p><a href="https://github.com/zainfathoni/vida/blob/main/docs/agent-workflow.md">Read the agent workflow and project format →</a></p>
+      </div>
+      <div class="code-block">
+        <div class="code-head"><span>Output from the demo project</span></div>
+<pre tabindex="0"><code><span class="prompt">$</span> node bin/vida.js validate "Demo episode (agent draft).vida.json"
+<span class="ok">Valid: Demo episode</span>
+4 clips, 3 selects, 26.200 s, 1920x1080 at 30 fps, 6 caption cues
+  source take1: intro-take-1.mp4, 12.000 s, 2 transcript lines
+  source take2: intro-take-2.mp4, 13.000 s, 2 transcript lines
+  source screen: screen-demo.mp4, 24.000 s, 3 transcript lines
+  source outro: outro.mp4, 7.000 s, 1 transcript lines
+
+<span class="prompt">$</span> node bin/vida.js export "Demo episode (agent draft).vida.json"
+<span class="muted"># writes exports/Demo episode (agent draft).mp4, .srt, and .vtt</span></code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="local" aria-labelledby="local-title">
+      <div class="section-head">
+        <h2 id="local-title">Local by design</h2>
+        <p class="muted">This website is only a homepage. The editor is not hosted. It runs on your computer.</p>
+      </div>
+      <div class="grid two">
+        <article class="panel">
+          <div class="panel-head"><h3>What stays on your computer</h3><span class="badge ok">local</span></div>
+          <ul class="plain">
+            <li>The editor server listens on <code>127.0.0.1</code> only. Other computers cannot connect to it.</li>
+            <li>FFmpeg reads your files and renders the export on your computer.</li>
+            <li>There are no accounts, no cloud storage, and no publishing.</li>
+            <li>With local whisper.cpp, the audio stays on your computer.</li>
+          </ul>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><h3>What can leave your computer</h3><span class="badge warn">optional</span></div>
+          <ul class="plain">
+            <li>You can set up an OpenAI-compatible transcription API. When you click <b>Transcribe (API)</b>, Vida extracts the audio of that video and uploads it to the provider that you configure.</li>
+            <li>Vida does not upload the picture. Vida itself makes no other network requests.</li>
+            <li>To upload nothing, use whisper.cpp or import SRT or VTT files that you already have.</li>
+          </ul>
+        </article>
+      </div>
+      <p class="note">While the server runs, any program on your computer can use it. It can list your folders, read video files, and write files where your user account can write. Run Vida only on a computer that you trust, and stop it when you do not use it.</p>
+    </section>
+
+    <section class="section" id="install" aria-labelledby="install-title">
+      <div class="section-head">
+        <h2 id="install-title">Install</h2>
+        <p class="muted">Vida is free and open source under the MIT License.</p>
+      </div>
+      <div class="grid two">
+        <article class="panel">
+          <div class="panel-head"><h3>You need</h3></div>
+          <ul class="plain">
+            <li>Node.js 20 or newer.</li>
+            <li>FFmpeg with <code>ffprobe</code>. On macOS: <code>brew install ffmpeg</code>.</li>
+            <li>A Chromium-based browser. Other browsers are not tested.</li>
+            <li>Optional: whisper.cpp and a model, for local transcripts.</li>
+          </ul>
+        </article>
+        <div class="code-block" data-copy-block>
+          <div class="code-head"><span>Terminal</span><button type="button" class="small" data-copy aria-live="polite">Copy</button></div>
+<pre tabindex="0"><code>git clone https://github.com/zainfathoni/vida.git
+cd vida
+npm start   # opens http://localhost:5178/</code></pre>
+        </div>
+      </div>
+      <p class="links">
+        <a class="button primary" href="https://github.com/zainfathoni/vida">GitHub repository</a>
+        <a class="button" href="https://github.com/zainfathoni/vida#readme">README and setup</a>
+        <a class="button" href="https://github.com/zainfathoni/vida#transcription-setup">Transcription setup</a>
+        <a class="button" href="https://github.com/zainfathoni/vida/blob/main/AGENTS.md">Rules for agents</a>
+      </p>
+    </section>
+
+    <section class="section" id="status" aria-labelledby="status-title">
+      <div class="status-bar" role="note">
+        <h2 id="status-title">Status: experimental</h2>
+        <p>Vida was tested only on Linux, in Chromium, with generated test videos. It was not tested on macOS, Windows, or Safari, or with real camera and screen recordings. The API transcription option was tested only with a mock API. Keep backups of your project files.</p>
+        <p class="muted">Vida does not do multicam, transitions, audio level controls, automatic vertical crops, or motion graphics. It has no AI features of its own: the agent that you use makes the suggestions.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Vida · <a href="https://github.com/zainfathoni/vida/blob/main/LICENSE">MIT License</a> · by <a href="https://zainfathoni.com/">Zain Fathoni</a></span>
+    <span class="muted">FFmpeg, whisper.cpp, and whisper models are not included. Their own licences apply.</span>
+  </footer>
+
+  <script src="site.js" defer></script>
+</body>
+</html>
