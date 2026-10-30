@@ -11,7 +11,7 @@
     "start": "node server/index.js --open",
     "serve": "node server/index.js",
     "test": "node --test test/unit.test.js",
-    "test:e2e": "node --test test/e2e.test.js",
+    "test:e2e": "node --test test/e2e.test.js test/export.test.js",
     "fixtures": "node scripts/make-fixtures.js fixtures",
     "vida": "node bin/vida.js"
   }

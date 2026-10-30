@@ -66,8 +66,18 @@ export function captionFiles(project) {
 
 function assertSafeOutput(project, file) {
   const resolved = path.resolve(file);
+  let output;
+  try {
+    output = fs.statSync(resolved);
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
   for (const s of project.sources) {
-    if (path.resolve(s.path) === resolved) throw new Error('The output file cannot replace a source file.');
+    // stat follows symlinks and detects case-only paths and hard links.
+    const source = output && !s.missing ? fs.statSync(s.path) : null;
+    if (path.resolve(s.path) === resolved || (source && source.dev === output.dev && source.ino === output.ino)) {
+      throw new Error('The output file cannot replace a source file.');
+    }
   }
 }
 
@@ -86,7 +96,10 @@ export async function exportProject(project, outFile, job) {
   project = await checkMedia(project, { requireMedia: true });
   if (!project.sequence.length) throw new Error('The sequence is empty.');
   if (!/\.mp4$/i.test(outFile)) throw new Error('The output file name must end with .mp4.');
-  assertSafeOutput(project, outFile);
+  const base = outFile.replace(/\.mp4$/i, '');
+  for (const file of [outFile, outFile + '.part.mp4', base + '.srt', base + '.vtt']) {
+    assertSafeOutput(project, file);
+  }
   const { args, plan, settings } = buildExportArgs(project, outFile + '.part.mp4');
   const total = planDuration(plan);
   let proc;
@@ -100,6 +113,6 @@ export async function exportProject(project, outFile, job) {
     throw err;
   }
   fs.renameSync(outFile + '.part.mp4', outFile);
-  const captions = await writeCaptions(project, outFile.replace(/\.mp4$/i, ''));
+  const captions = await writeCaptions(project, base);
   return { video: outFile, ...captions, duration: total, settings };
 }
