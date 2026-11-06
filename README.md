@@ -182,6 +182,8 @@ npm run test:e2e    # makes test videos with FFmpeg, exports sequences, and meas
 node --test test/whisper.test.js   # optional, needs whisper.cpp settings
 ```
 
+Fixture speech uses FFmpeg's `flite` filter. On macOS, it uses the built-in `say` command with the Samantha voice if that filter is not available. Video labels are added only when FFmpeg has `drawtext` and a suitable font is installed. These optional labels are not needed for the frame and audio checks.
+
 The end-to-end test makes three videos with different sizes, frame rates, codecs, and durations. One video has no audio. Each video has a different color, white flash frames with a 3 kHz beep at known times, and synthetic speech at known times. The test exports cuts from all three videos in a new order and checks:
 
 - the video frame count and the audio length,

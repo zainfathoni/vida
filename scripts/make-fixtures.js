@@ -1,7 +1,8 @@
 // Generates test videos with known content, for checks without real recordings.
 // Each source has its own background color, white flash frames at known times,
-// a 3 kHz beep at the same times (A/V sync marker), and synthetic speech (flite)
-// at known times. truth.json records all of it.
+// a 3 kHz beep at the same times (A/V sync marker), and synthetic speech
+// at known times. Speech uses flite, or macOS say when flite is not available.
+// truth.json records all of it.
 //
 // Usage: node scripts/make-fixtures.js <output-folder>
 import fs from 'node:fs';
@@ -44,13 +45,18 @@ const SOURCES = [
 const ff = (args) => execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...args], { stdio: ['ignore', 'inherit', 'inherit'] });
 const duration = (file) => Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]).toString());
 const FONT = ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', '/System/Library/Fonts/Supplemental/Arial Bold.ttf'].find((f) => fs.existsSync(f));
+const filters = execFileSync('ffmpeg', ['-hide_banner', '-filters'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+const hasFlite = /^\s*\S+\s+flite\s/m.test(filters);
+const hasDrawtext = /^\s*\S+\s+drawtext\s/m.test(filters);
+if (!hasFlite && process.platform !== 'darwin') throw new Error('Fixture speech needs FFmpeg with the flite filter, or macOS say.');
+console.log(`Fixture speech: ${hasFlite ? 'FFmpeg flite (slt)' : 'macOS say (Samantha)'}`);
 
 const truth = { flash: FLASH, sources: {} };
 const tmp = fs.mkdtempSync(path.join(outDir, '.tmp-'));
 
 for (const s of SOURCES) {
   const enable = s.flashes.map((t) => `between(t,${t},${(t + FLASH).toFixed(3)})`).join('+');
-  const text = FONT ? `,drawtext=fontfile='${FONT}':text='${s.label}  %{pts\\:hms}':x=40:y=40:fontsize=${Math.round(s.h / 14)}:fontcolor=white` : '';
+  const text = FONT && hasDrawtext ? `,drawtext=fontfile='${FONT}':text='${s.label}  %{pts\\:hms}':x=40:y=40:fontsize=${Math.round(s.h / 14)}:fontcolor=white` : '';
   const vf = `drawgrid=w=${s.w / 8}:h=${s.h / 8}:t=2:c=white@0.15${text},drawbox=x=0:y=0:w=iw:h=ih:color=white:t=fill:enable='${enable}'`;
   const args = ['-f', 'lavfi', '-i', `color=c=${s.color}:s=${s.w}x${s.h}:r=${s.fps}:d=${s.dur}`];
   const phrases = [];
@@ -59,7 +65,11 @@ for (const s of SOURCES) {
     const mixes = [];
     s.phrases.forEach(([start, said], i) => {
       const wav = path.join(tmp, `${s.id}${i}.wav`);
-      ff(['-f', 'lavfi', '-i', `flite=text='${said.replace(/'/g, '')}':voice=slt`, '-ar', '48000', wav]);
+      if (hasFlite) {
+        ff(['-f', 'lavfi', '-i', `flite=text='${said.replace(/'/g, '')}':voice=slt`, '-ar', '48000', wav]);
+      } else {
+        execFileSync('/usr/bin/say', ['-v', 'Samantha', '--file-format=WAVE', '--data-format=LEI16@48000', '-o', wav, said], { stdio: ['ignore', 'inherit', 'inherit'] });
+      }
       phrases.push({ start, end: +(start + duration(wav)).toFixed(3), text: said });
       inputs.push('-i', wav);
       mixes.push(`[${i + 2}:a]adelay=${Math.round(start * 1000)}:all=1,volume=1.5[p${i}]`);
