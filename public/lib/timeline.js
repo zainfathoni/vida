@@ -204,7 +204,9 @@ export function groupWords(words, opts = {}) {
       const gap = word.start - cur.end;
       const last = cur.words[cur.words.length - 1].text;
       const sentenceEnd = /[.!?]["')\]]?$/.test(last) && len > 24;
-      if (gap > o.maxGap || len > o.maxChars || word.end - cur.start > o.maxDuration || sentenceEnd) flush();
+      // Keep shared or near-shared times together, even past the line limit.
+      // Otherwise overlap cleanup can shorten the earlier cue below 0.05 s.
+      if (word.start - cur.start >= 0.05 && (gap > o.maxGap || len > o.maxChars || word.end - cur.start > o.maxDuration || sentenceEnd)) flush();
     }
     if (!cur) cur = { start: word.start, end: word.end, words: [] };
     cur.words.push(word);

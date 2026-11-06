@@ -65,6 +65,23 @@ test('a word is kept only when its midpoint is inside the cut', () => {
   assert.deepEqual(cues.map((c) => c.text), ['b']);
 });
 
+test('captions keep words with shared or nearly shared start times', () => {
+  const text = 'token-01 token-02 token-03 token-04 token-05 token-06 token-07 token-08 token-09 token-10 token-11 token-12 token-13 token-14 last';
+  const plan = buildPlan([{ id: 'c', sourceId: 'S', in: 0, out: 3 }], 30);
+  for (const gap of [0, 0.04, 0.06]) {
+    const words = text.split(' ').map((text, i) => ({ start: i < 9 ? 1 : 1 + gap, end: text === 'last' ? 1.6 : (i < 9 ? 1 : 1 + gap) + 0.1, text }));
+    const cues = remapCaptions(plan, { S: { segments: [{ start: 1, end: 1.6, text, words }] } });
+    assert.equal(cues.map((c) => c.text).join(' '), text);
+    assert.equal(parseSubtitles(toSRT(cues)).map((c) => c.text).join(' '), text);
+    close(cues[0].start, 1);
+    close(cues.at(-1).end, 1.6);
+    assert.ok(cues.every((c) => c.end - c.start >= 0.05 && c.start >= 0 && c.end <= 3));
+    assert.ok(cues.every((c, i) => i === 0 || cues[i - 1].end <= c.start));
+    // Keep the normal line limit when both overlapping cues can survive.
+    if (gap === 0.06) assert.ok(cues.every((c) => c.text.length <= 84));
+  }
+});
+
 test('captions without word timing are clipped to the cut; short leftovers are dropped', () => {
   const tr = { S: { segments: [{ start: 1, end: 3, text: 'first line' }, { start: 3.5, end: 6, text: 'second line' }] } };
   const plan = buildPlan(
