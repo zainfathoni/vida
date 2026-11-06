@@ -40,7 +40,6 @@ export const config = {
   ffprobe: process.env.FFPROBE_PATH || 'ffprobe',
   whisperBin: process.env.WHISPER_CPP_BIN || findOnPath(['whisper-cli', 'whisper-cpp']),
   whisperModel: process.env.WHISPER_CPP_MODEL || '',
-  whisperVadModel: process.env.WHISPER_CPP_VAD_MODEL || '',
   whisperLanguage: process.env.WHISPER_LANGUAGE || 'auto',
   openaiKey: process.env.OPENAI_API_KEY || '',
   openaiBaseUrl: (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, ''),
@@ -54,7 +53,7 @@ export function providerStatus() {
     whisper: {
       ready: whisperReady,
       detail: whisperReady
-        ? `whisper.cpp, model ${path.basename(config.whisperModel)}${config.whisperVadModel ? ' with VAD' : ' (no VAD model: word times are less exact)'}`
+        ? `whisper.cpp, model ${path.basename(config.whisperModel)} with DTW word alignment`
         : !config.whisperBin
           ? 'whisper.cpp program not found. Set WHISPER_CPP_BIN.'
           : 'Model file not set or not found. Set WHISPER_CPP_MODEL.',

@@ -111,19 +111,21 @@ Put settings in a `.env` file in the `vida` folder (copy `.env.example`), or set
 
 Audio stays on your computer.
 
-1. Install whisper.cpp. On macOS: `brew install whisper-cpp`. This installs `whisper-cli`.
+1. Install a current whisper.cpp version with DTW alignment and full JSON output. On macOS: `brew install whisper-cpp`. This installs `whisper-cli`.
 2. Download a model, for example [ggml-base.en.bin](https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin) (English, 148 MB) or `ggml-small.bin` (multilingual) from the same place.
-3. Download the voice activity detection model [ggml-silero-v5.1.2.bin](https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin). Without it, whisper.cpp often puts word times inside silent parts, and captions start too early.
-4. Set the paths in `.env`:
+3. Set the paths in `.env`:
 
    ```sh
    WHISPER_CPP_BIN=/opt/homebrew/bin/whisper-cli
    WHISPER_CPP_MODEL=/Users/you/models/ggml-base.en.bin
-   WHISPER_CPP_VAD_MODEL=/Users/you/models/ggml-silero-v5.1.2.bin
    # WHISPER_LANGUAGE=auto   (for multilingual models; .en models use English)
    ```
 
-5. Restart Vida.
+4. Restart Vida.
+
+Vida uses DTW token alignment on the original audio timeline. It disables flash attention and does not remove silence with VAD. This can use more time and memory. An old `WHISPER_CPP_VAD_MODEL` setting is no longer used; you do not need to delete the model file. Segment and word-length limits stop estimated word tails in silence. The last aligned subword point can extend the word past those limits, so that aligned speech is not cut off. The next aligned word and the source end still cap the word end. Review the transcript before you use it for cuts: alignment does not guarantee correct words or exact speech boundaries.
+
+Standard tiny, base, small, medium, large-v1/v2/v3, and large-v3-turbo models are supported, including quantized models and English variants where available. Vida reads the model header to choose the alignment preset. Large-v1 and large-v2 have the same header, so keep `large-v1` or `large-v2` in those file names. Distilled and custom architectures with no matching DTW preset are not supported. Missing alignment is an error; Vida does not fall back to approximate segment times.
 
 ### Option 2: OpenAI-compatible API
 
